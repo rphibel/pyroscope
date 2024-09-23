@@ -347,6 +347,10 @@ func (q *Querier) LabelNames(ctx context.Context, req *connect.Request[typesv1.L
 	}), nil
 }
 
+func (q *Querier) LabelSummaries(_ context.Context, _ *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	panic("unimplemented")
+}
+
 func (q *Querier) blockSelect(ctx context.Context, start, end model.Time) (blockPlan, error) {
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "blockSelect")
 	defer sp.Finish()

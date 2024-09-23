@@ -53,6 +53,17 @@ message LabelNamesResponse {
   repeated string names = 1;
 }
 
+message LabelSummariesRequest {}
+
+message LabelSummariesResponse {
+  repeated LabelSummary summaries = 1;
+}
+
+message LabelSummary {
+  bytes hll = 1;
+  repeated string values = 2;
+}
+
 message BlockInfo {
   string ulid = 1;
   int64 min_time = 2;

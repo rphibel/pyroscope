@@ -43,6 +43,9 @@ const (
 	// IngesterServiceLabelNamesProcedure is the fully-qualified name of the IngesterService's
 	// LabelNames RPC.
 	IngesterServiceLabelNamesProcedure = "/ingester.v1.IngesterService/LabelNames"
+	// IngesterServiceLabelSummariesProcedure is the fully-qualified name of the IngesterService's
+	// LabelSummaries RPC.
+	IngesterServiceLabelSummariesProcedure = "/ingester.v1.IngesterService/LabelSummaries"
 	// IngesterServiceProfileTypesProcedure is the fully-qualified name of the IngesterService's
 	// ProfileTypes RPC.
 	IngesterServiceProfileTypesProcedure = "/ingester.v1.IngesterService/ProfileTypes"
@@ -79,6 +82,7 @@ var (
 	ingesterServicePushMethodDescriptor                     = ingesterServiceServiceDescriptor.Methods().ByName("Push")
 	ingesterServiceLabelValuesMethodDescriptor              = ingesterServiceServiceDescriptor.Methods().ByName("LabelValues")
 	ingesterServiceLabelNamesMethodDescriptor               = ingesterServiceServiceDescriptor.Methods().ByName("LabelNames")
+	ingesterServiceLabelSummariesMethodDescriptor           = ingesterServiceServiceDescriptor.Methods().ByName("LabelSummaries")
 	ingesterServiceProfileTypesMethodDescriptor             = ingesterServiceServiceDescriptor.Methods().ByName("ProfileTypes")
 	ingesterServiceSeriesMethodDescriptor                   = ingesterServiceServiceDescriptor.Methods().ByName("Series")
 	ingesterServiceFlushMethodDescriptor                    = ingesterServiceServiceDescriptor.Methods().ByName("Flush")
@@ -96,6 +100,7 @@ type IngesterServiceClient interface {
 	Push(context.Context, *connect.Request[v11.PushRequest]) (*connect.Response[v11.PushResponse], error)
 	LabelValues(context.Context, *connect.Request[v12.LabelValuesRequest]) (*connect.Response[v12.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error)
 	// Deprecated: ProfileType call is deprecated in the store components
 	// TODO: Remove this call in release v1.4
 	ProfileTypes(context.Context, *connect.Request[v1.ProfileTypesRequest]) (*connect.Response[v1.ProfileTypesResponse], error)
@@ -137,6 +142,12 @@ func NewIngesterServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			httpClient,
 			baseURL+IngesterServiceLabelNamesProcedure,
 			connect.WithSchema(ingesterServiceLabelNamesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		labelSummaries: connect.NewClient[v12.LabelSummariesRequest, v12.LabelSummariesResponse](
+			httpClient,
+			baseURL+IngesterServiceLabelSummariesProcedure,
+			connect.WithSchema(ingesterServiceLabelSummariesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		profileTypes: connect.NewClient[v1.ProfileTypesRequest, v1.ProfileTypesResponse](
@@ -207,6 +218,7 @@ type ingesterServiceClient struct {
 	push                     *connect.Client[v11.PushRequest, v11.PushResponse]
 	labelValues              *connect.Client[v12.LabelValuesRequest, v12.LabelValuesResponse]
 	labelNames               *connect.Client[v12.LabelNamesRequest, v12.LabelNamesResponse]
+	labelSummaries           *connect.Client[v12.LabelSummariesRequest, v12.LabelSummariesResponse]
 	profileTypes             *connect.Client[v1.ProfileTypesRequest, v1.ProfileTypesResponse]
 	series                   *connect.Client[v1.SeriesRequest, v1.SeriesResponse]
 	flush                    *connect.Client[v1.FlushRequest, v1.FlushResponse]
@@ -232,6 +244,11 @@ func (c *ingesterServiceClient) LabelValues(ctx context.Context, req *connect.Re
 // LabelNames calls ingester.v1.IngesterService.LabelNames.
 func (c *ingesterServiceClient) LabelNames(ctx context.Context, req *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error) {
 	return c.labelNames.CallUnary(ctx, req)
+}
+
+// LabelSummaries calls ingester.v1.IngesterService.LabelSummaries.
+func (c *ingesterServiceClient) LabelSummaries(ctx context.Context, req *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error) {
+	return c.labelSummaries.CallUnary(ctx, req)
 }
 
 // ProfileTypes calls ingester.v1.IngesterService.ProfileTypes.
@@ -289,6 +306,7 @@ type IngesterServiceHandler interface {
 	Push(context.Context, *connect.Request[v11.PushRequest]) (*connect.Response[v11.PushResponse], error)
 	LabelValues(context.Context, *connect.Request[v12.LabelValuesRequest]) (*connect.Response[v12.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error)
 	// Deprecated: ProfileType call is deprecated in the store components
 	// TODO: Remove this call in release v1.4
 	ProfileTypes(context.Context, *connect.Request[v1.ProfileTypesRequest]) (*connect.Response[v1.ProfileTypesResponse], error)
@@ -326,6 +344,12 @@ func NewIngesterServiceHandler(svc IngesterServiceHandler, opts ...connect.Handl
 		IngesterServiceLabelNamesProcedure,
 		svc.LabelNames,
 		connect.WithSchema(ingesterServiceLabelNamesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	ingesterServiceLabelSummariesHandler := connect.NewUnaryHandler(
+		IngesterServiceLabelSummariesProcedure,
+		svc.LabelSummaries,
+		connect.WithSchema(ingesterServiceLabelSummariesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	ingesterServiceProfileTypesHandler := connect.NewUnaryHandler(
@@ -396,6 +420,8 @@ func NewIngesterServiceHandler(svc IngesterServiceHandler, opts ...connect.Handl
 			ingesterServiceLabelValuesHandler.ServeHTTP(w, r)
 		case IngesterServiceLabelNamesProcedure:
 			ingesterServiceLabelNamesHandler.ServeHTTP(w, r)
+		case IngesterServiceLabelSummariesProcedure:
+			ingesterServiceLabelSummariesHandler.ServeHTTP(w, r)
 		case IngesterServiceProfileTypesProcedure:
 			ingesterServiceProfileTypesHandler.ServeHTTP(w, r)
 		case IngesterServiceSeriesProcedure:
@@ -435,6 +461,10 @@ func (UnimplementedIngesterServiceHandler) LabelValues(context.Context, *connect
 
 func (UnimplementedIngesterServiceHandler) LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ingester.v1.IngesterService.LabelNames is not implemented"))
+}
+
+func (UnimplementedIngesterServiceHandler) LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("ingester.v1.IngesterService.LabelSummaries is not implemented"))
 }
 
 func (UnimplementedIngesterServiceHandler) ProfileTypes(context.Context, *connect.Request[v1.ProfileTypesRequest]) (*connect.Response[v1.ProfileTypesResponse], error) {

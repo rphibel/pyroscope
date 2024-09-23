@@ -1,8 +1,11 @@
 package testutil
 
 import (
-	"connectrpc.com/connect"
 	"context"
+	"net/http"
+	"testing"
+
+	"connectrpc.com/connect"
 	ingestv1 "github.com/grafana/pyroscope/api/gen/proto/go/ingester/v1"
 	"github.com/grafana/pyroscope/api/gen/proto/go/ingester/v1/ingesterv1connect"
 	pushv1 "github.com/grafana/pyroscope/api/gen/proto/go/push/v1"
@@ -12,8 +15,6 @@ import (
 	"github.com/grafana/pyroscope/pkg/testhelper"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 // Copied from phlaredb, todo
@@ -61,6 +62,10 @@ func (i *IngesterHandlerPhlareDB) LabelValues(context.Context, *connect.Request[
 }
 
 func (i *IngesterHandlerPhlareDB) LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error) {
+	return nil, errors.New("not implemented")
+}
+
+func (i IngesterHandlerPhlareDB) LabelSummaries(context.Context, *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
 	return nil, errors.New("not implemented")
 }
 

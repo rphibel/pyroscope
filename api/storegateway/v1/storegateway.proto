@@ -17,6 +17,7 @@ service StoreGatewayService {
   rpc ProfileTypes(ingester.v1.ProfileTypesRequest) returns (ingester.v1.ProfileTypesResponse) {}
   rpc LabelValues(types.v1.LabelValuesRequest) returns (types.v1.LabelValuesResponse) {}
   rpc LabelNames(types.v1.LabelNamesRequest) returns (types.v1.LabelNamesResponse) {}
+  rpc LabelSummaries(types.v1.LabelSummariesRequest) returns (types.v1.LabelSummariesResponse) {}
   rpc Series(ingester.v1.SeriesRequest) returns (ingester.v1.SeriesResponse) {}
   rpc BlockMetadata(ingester.v1.BlockMetadataRequest) returns (ingester.v1.BlockMetadataResponse) {}
   rpc GetBlockStats(ingester.v1.GetBlockStatsRequest) returns (ingester.v1.GetBlockStatsResponse) {}

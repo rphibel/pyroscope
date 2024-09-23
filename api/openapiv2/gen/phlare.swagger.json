@@ -1228,6 +1228,33 @@
         }
       }
     },
+    "v1LabelSummariesResponse": {
+      "type": "object",
+      "properties": {
+        "summaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1LabelSummary"
+          }
+        }
+      }
+    },
+    "v1LabelSummary": {
+      "type": "object",
+      "properties": {
+        "hll": {
+          "type": "string",
+          "format": "byte"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "v1LabelValuesQuery": {
       "type": "object",
       "properties": {

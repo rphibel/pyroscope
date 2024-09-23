@@ -39,6 +39,7 @@ type StoreGatewayServiceClient interface {
 	ProfileTypes(ctx context.Context, in *v1.ProfileTypesRequest, opts ...grpc.CallOption) (*v1.ProfileTypesResponse, error)
 	LabelValues(ctx context.Context, in *v11.LabelValuesRequest, opts ...grpc.CallOption) (*v11.LabelValuesResponse, error)
 	LabelNames(ctx context.Context, in *v11.LabelNamesRequest, opts ...grpc.CallOption) (*v11.LabelNamesResponse, error)
+	LabelSummaries(ctx context.Context, in *v11.LabelSummariesRequest, opts ...grpc.CallOption) (*v11.LabelSummariesResponse, error)
 	Series(ctx context.Context, in *v1.SeriesRequest, opts ...grpc.CallOption) (*v1.SeriesResponse, error)
 	BlockMetadata(ctx context.Context, in *v1.BlockMetadataRequest, opts ...grpc.CallOption) (*v1.BlockMetadataResponse, error)
 	GetBlockStats(ctx context.Context, in *v1.GetBlockStatsRequest, opts ...grpc.CallOption) (*v1.GetBlockStatsResponse, error)
@@ -203,6 +204,15 @@ func (c *storeGatewayServiceClient) LabelNames(ctx context.Context, in *v11.Labe
 	return out, nil
 }
 
+func (c *storeGatewayServiceClient) LabelSummaries(ctx context.Context, in *v11.LabelSummariesRequest, opts ...grpc.CallOption) (*v11.LabelSummariesResponse, error) {
+	out := new(v11.LabelSummariesResponse)
+	err := c.cc.Invoke(ctx, "/storegateway.v1.StoreGatewayService/LabelSummaries", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *storeGatewayServiceClient) Series(ctx context.Context, in *v1.SeriesRequest, opts ...grpc.CallOption) (*v1.SeriesResponse, error) {
 	out := new(v1.SeriesResponse)
 	err := c.cc.Invoke(ctx, "/storegateway.v1.StoreGatewayService/Series", in, out, opts...)
@@ -243,6 +253,7 @@ type StoreGatewayServiceServer interface {
 	ProfileTypes(context.Context, *v1.ProfileTypesRequest) (*v1.ProfileTypesResponse, error)
 	LabelValues(context.Context, *v11.LabelValuesRequest) (*v11.LabelValuesResponse, error)
 	LabelNames(context.Context, *v11.LabelNamesRequest) (*v11.LabelNamesResponse, error)
+	LabelSummaries(context.Context, *v11.LabelSummariesRequest) (*v11.LabelSummariesResponse, error)
 	Series(context.Context, *v1.SeriesRequest) (*v1.SeriesResponse, error)
 	BlockMetadata(context.Context, *v1.BlockMetadataRequest) (*v1.BlockMetadataResponse, error)
 	GetBlockStats(context.Context, *v1.GetBlockStatsRequest) (*v1.GetBlockStatsResponse, error)
@@ -273,6 +284,9 @@ func (UnimplementedStoreGatewayServiceServer) LabelValues(context.Context, *v11.
 }
 func (UnimplementedStoreGatewayServiceServer) LabelNames(context.Context, *v11.LabelNamesRequest) (*v11.LabelNamesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LabelNames not implemented")
+}
+func (UnimplementedStoreGatewayServiceServer) LabelSummaries(context.Context, *v11.LabelSummariesRequest) (*v11.LabelSummariesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LabelSummaries not implemented")
 }
 func (UnimplementedStoreGatewayServiceServer) Series(context.Context, *v1.SeriesRequest) (*v1.SeriesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Series not implemented")
@@ -454,6 +468,24 @@ func _StoreGatewayService_LabelNames_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StoreGatewayService_LabelSummaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v11.LabelSummariesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreGatewayServiceServer).LabelSummaries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/storegateway.v1.StoreGatewayService/LabelSummaries",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreGatewayServiceServer).LabelSummaries(ctx, req.(*v11.LabelSummariesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _StoreGatewayService_Series_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(v1.SeriesRequest)
 	if err := dec(in); err != nil {
@@ -526,6 +558,10 @@ var StoreGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LabelNames",
 			Handler:    _StoreGatewayService_LabelNames_Handler,
+		},
+		{
+			MethodName: "LabelSummaries",
+			Handler:    _StoreGatewayService_LabelSummaries_Handler,
 		},
 		{
 			MethodName: "Series",

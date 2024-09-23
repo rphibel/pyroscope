@@ -23,6 +23,10 @@ func (i *Ingester) LabelNames(ctx context.Context, req *connect.Request[typesv1.
 	})
 }
 
+func (i *Ingester) LabelSummaries(_ context.Context, _ *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	panic("unimplemented")
+}
+
 // ProfileTypes returns the possible profile types.
 func (i *Ingester) ProfileTypes(ctx context.Context, req *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error) {
 	return forInstanceUnary(ctx, i, func(instance *instance) (*connect.Response[ingestv1.ProfileTypesResponse], error) {

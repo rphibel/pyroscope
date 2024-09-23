@@ -43,6 +43,10 @@ func (r *Router) LabelNames(
 		})
 }
 
+func (r *Router) LabelSummaries(ctx context.Context, c *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	panic("unimplemented")
+}
+
 func (r *Router) Series(
 	ctx context.Context,
 	c *connect.Request[querierv1.SeriesRequest],
