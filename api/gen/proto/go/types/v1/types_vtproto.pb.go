@@ -226,6 +226,13 @@ func (m *LabelSummariesRequest) CloneVT() *LabelSummariesRequest {
 		return (*LabelSummariesRequest)(nil)
 	}
 	r := new(LabelSummariesRequest)
+	r.Start = m.Start
+	r.End = m.End
+	if rhs := m.Matchers; rhs != nil {
+		tmpContainer := make([]string, len(rhs))
+		copy(tmpContainer, rhs)
+		r.Matchers = tmpContainer
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -265,6 +272,7 @@ func (m *LabelSummary) CloneVT() *LabelSummary {
 		return (*LabelSummary)(nil)
 	}
 	r := new(LabelSummary)
+	r.Name = m.Name
 	if rhs := m.Hll; rhs != nil {
 		tmpBytes := make([]byte, len(rhs))
 		copy(tmpBytes, rhs)
@@ -733,6 +741,21 @@ func (this *LabelSummariesRequest) EqualVT(that *LabelSummariesRequest) bool {
 	} else if this == nil || that == nil {
 		return false
 	}
+	if len(this.Matchers) != len(that.Matchers) {
+		return false
+	}
+	for i, vx := range this.Matchers {
+		vy := that.Matchers[i]
+		if vx != vy {
+			return false
+		}
+	}
+	if this.Start != that.Start {
+		return false
+	}
+	if this.End != that.End {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -783,6 +806,9 @@ func (this *LabelSummary) EqualVT(that *LabelSummary) bool {
 		return false
 	}
 	if string(this.Hll) != string(that.Hll) {
+		return false
+	}
+	if this.Name != that.Name {
 		return false
 	}
 	if len(this.Values) != len(that.Values) {
@@ -1516,6 +1542,25 @@ func (m *LabelSummariesRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error)
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.End != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.End))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.Start != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.Start))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.Matchers) > 0 {
+		for iNdEx := len(m.Matchers) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Matchers[iNdEx])
+			copy(dAtA[i:], m.Matchers[iNdEx])
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Matchers[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -1600,8 +1645,15 @@ func (m *LabelSummary) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 			copy(dAtA[i:], m.Values[iNdEx])
 			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Values[iNdEx])))
 			i--
-			dAtA[i] = 0x12
+			dAtA[i] = 0x1a
 		}
+	}
+	if len(m.Name) > 0 {
+		i -= len(m.Name)
+		copy(dAtA[i:], m.Name)
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0x12
 	}
 	if len(m.Hll) > 0 {
 		i -= len(m.Hll)
@@ -2202,6 +2254,18 @@ func (m *LabelSummariesRequest) SizeVT() (n int) {
 	}
 	var l int
 	_ = l
+	if len(m.Matchers) > 0 {
+		for _, s := range m.Matchers {
+			l = len(s)
+			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
+		}
+	}
+	if m.Start != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.Start))
+	}
+	if m.End != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.End))
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -2229,6 +2293,10 @@ func (m *LabelSummary) SizeVT() (n int) {
 	var l int
 	_ = l
 	l = len(m.Hll)
+	if l > 0 {
+		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
+	}
+	l = len(m.Name)
 	if l > 0 {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
@@ -3502,6 +3570,76 @@ func (m *LabelSummariesRequest) UnmarshalVT(dAtA []byte) error {
 			return fmt.Errorf("proto: LabelSummariesRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Matchers", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Matchers = append(m.Matchers, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Start", wireType)
+			}
+			m.Start = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Start |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field End", wireType)
+			}
+			m.End = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.End |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -3673,6 +3811,38 @@ func (m *LabelSummary) UnmarshalVT(dAtA []byte) error {
 			}
 			iNdEx = postIndex
 		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Values", wireType)
 			}

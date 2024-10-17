@@ -327,6 +327,52 @@ func (h *Head) LabelNames(ctx context.Context, req *connect.Request[typesv1.Labe
 	}), nil
 }
 
+func (h *Head) LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest) (*typesv1.LabelSummariesResponse, error) {
+	selectors, err := parseSelectors(req.Matchers)
+	if err != nil {
+		return nil, err
+	}
+
+	// Label name => label value => label value count.
+	cardinality := map[string]map[string]uint64{}
+
+	err = h.forMatchingSelectors(selectors, func(labels phlaremodel.Labels, fp model.Fingerprint) error {
+		for _, label := range labels {
+			if _, ok := cardinality[label.Name]; !ok {
+				cardinality[label.Name] = map[string]uint64{
+					label.Value: 0,
+				}
+			}
+			cardinality[label.Name][label.Value]++
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &typesv1.LabelSummariesResponse{
+		Summaries: make([]*typesv1.LabelSummary, 0, len(cardinality)),
+	}
+
+	for name, values := range cardinality {
+		valuesList := make([]string, 0, len(values))
+		for value := range values {
+			valuesList = append(valuesList, value)
+		}
+		sort.Strings(valuesList)
+
+		summary := &typesv1.LabelSummary{
+			Hll:    nil,
+			Name:   name,
+			Values: valuesList,
+		}
+		res.Summaries = append(res.Summaries, summary)
+	}
+
+	return res, nil
+}
+
 func (h *Head) MustProfileTypeNames() []string {
 	ptypes, err := h.profiles.index.ix.LabelValues(phlaremodel.LabelNameProfileType, nil)
 	if err != nil {

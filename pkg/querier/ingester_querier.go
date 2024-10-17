@@ -24,6 +24,7 @@ import (
 type IngesterQueryClient interface {
 	LabelValues(context.Context, *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error)
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	Series(ctx context.Context, req *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error)
 	MergeProfilesStacktraces(context.Context) clientpool.BidiClientMergeProfilesStacktraces
@@ -264,6 +265,23 @@ func (q *Querier) labelNamesFromIngesters(ctx context.Context, req *typesv1.Labe
 			return nil, err
 		}
 		return res.Msg.Names, nil
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return responses, nil
+}
+
+func (q *Querier) labelSummariesFromIngesters(ctx context.Context, req *typesv1.LabelSummariesRequest) ([]ResponseFromReplica[[]*typesv1.LabelSummary], error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "LabelSummaries Ingesters")
+	defer sp.Finish()
+
+	responses, err := forAllIngesters(ctx, q.ingesterQuerier, func(childCtx context.Context, ic IngesterQueryClient) ([]*typesv1.LabelSummary, error) {
+		res, err := ic.LabelSummaries(childCtx, connect.NewRequest(req))
+		if err != nil {
+			return nil, err
+		}
+		return res.Msg.Summaries, nil
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

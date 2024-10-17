@@ -1247,6 +1247,9 @@
           "type": "string",
           "format": "byte"
         },
+        "name": {
+          "type": "string"
+        },
         "values": {
           "type": "array",
           "items": {

@@ -505,6 +505,90 @@ func (b *singleBlockQuerier) LabelNames(ctx context.Context, req *connect.Reques
 	}), nil
 }
 
+func (b *singleBlockQuerier) LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest) (*typesv1.LabelSummariesResponse, error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "LabelNames LabelSummaries")
+	defer sp.Finish()
+
+	err := b.Open(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	b.queries.Add(1)
+	defer b.queries.Done()
+
+	selectors, err := parseSelectors(req.Matchers)
+	if err != nil {
+		return nil, err
+	}
+
+	var iters []index.Postings
+	for _, matchers := range selectors {
+		iter, err := PostingsForMatchers(b.index, nil, matchers...)
+		if err != nil {
+			return nil, err
+		}
+		iters = append(iters, iter)
+	}
+
+	// Label name => label value => label value count.
+	cardinality := map[string]map[string]uint64{}
+	iter := index.Intersect(iters...)
+
+	for iter.Next() {
+		names, err := b.index.LabelNamesFor(iter.At())
+		if err != nil {
+			if err == storage.ErrNotFound {
+				continue
+			}
+			return nil, err
+		}
+
+		for _, name := range names {
+			value, err := b.index.LabelValueFor(iter.At(), name)
+			if err != nil {
+				if err == storage.ErrNotFound {
+					continue
+				}
+				return nil, err
+			}
+
+			if _, ok := cardinality[name]; !ok {
+				cardinality[name] = map[string]uint64{
+					value: 0,
+				}
+			}
+			cardinality[name][value]++
+		}
+	}
+
+	err = iter.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &typesv1.LabelSummariesResponse{
+		Summaries: make([]*typesv1.LabelSummary, 0, len(cardinality)),
+	}
+
+	for name, values := range cardinality {
+		valuesList := make([]string, 0, len(values))
+		for value := range values {
+			valuesList = append(valuesList, value)
+		}
+		slices.Sort(valuesList)
+
+		summary := &typesv1.LabelSummary{
+			Hll:    nil,
+			Name:   name,
+			Values: valuesList,
+		}
+		res.Summaries = append(res.Summaries, summary)
+	}
+
+	return res, nil
+}
+
 func (b *singleBlockQuerier) BlockID() string {
 	return b.meta.ULID.String()
 }
@@ -581,6 +665,7 @@ type Querier interface {
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	LabelValues(ctx context.Context, req *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest) (*typesv1.LabelSummariesResponse, error)
 }
 
 type TimeBounded interface {
@@ -601,6 +686,7 @@ func InRange(q TimeBounded, start, end model.Time) bool {
 type ReadAPI interface {
 	LabelValues(context.Context, *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error)
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	Series(context.Context, *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error)
 	MergeProfilesStacktraces(context.Context, *connect.BidiStream[ingestv1.MergeProfilesStacktracesRequest, ingestv1.MergeProfilesStacktracesResponse]) error
@@ -660,6 +746,21 @@ func (queriers Queriers) LabelNames(ctx context.Context, req *connect.Request[ty
 		}
 	}
 	res, err := LabelNames(ctx, req, blockGetter)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(res), nil
+}
+
+func (queriers Queriers) LabelSummaries(ctx context.Context, req *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	blockGetter := queriers.ForTimeRange
+	if _, hasTimeRange := phlaremodel.GetTimeRange(req.Msg); !hasTimeRange {
+		blockGetter = func(_ context.Context, _, _ model.Time, _ *ingestv1.Hints) (Queriers, error) {
+			return queriers, nil
+		}
+	}
+
+	res, err := LabelSummaries(ctx, req.Msg, blockGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -1416,6 +1517,45 @@ func LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequ
 	return &typesv1.LabelNamesResponse{
 		Names: lo.Uniq(labelNames),
 	}, nil
+}
+
+func LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest, blockGetter BlockGetter) (*typesv1.LabelSummariesResponse, error) {
+	queriers, err := blockGetter(ctx, model.Time(req.Start), model.Time(req.End), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var labelSummaries []*typesv1.LabelSummary
+	var lock sync.Mutex
+	group, ctx := errgroup.WithContext(ctx)
+
+	const concurrentQueryLimit = 50
+	group.SetLimit(concurrentQueryLimit)
+
+	for _, q := range queriers {
+		group.Go(util.RecoverPanic(func() error {
+			res, err := q.LabelSummaries(ctx, req)
+			if err != nil {
+				return err
+			}
+
+			lock.Lock()
+			labelSummaries = append(labelSummaries, res.Summaries...)
+			lock.Unlock()
+			return nil
+		}))
+	}
+
+	err = group.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	labelSummaries = util.UniqueSortSummaries(labelSummaries)
+	res := &typesv1.LabelSummariesResponse{
+		Summaries: labelSummaries,
+	}
+	return res, nil
 }
 
 func Series(ctx context.Context, req *ingestv1.SeriesRequest, blockGetter BlockGetter) (*ingestv1.SeriesResponse, error) {
