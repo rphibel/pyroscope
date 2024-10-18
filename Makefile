@@ -290,7 +290,7 @@ $(BIN)/buf: Makefile
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
-	GOBIN=$(abspath $(@D)) $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+	GOBIN=$(abspath $(@D)) $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 
 $(BIN)/protoc-gen-go: Makefile go.mod
 	@mkdir -p $(@D)
@@ -350,7 +350,7 @@ $(BIN)/mockery: Makefile go.mod
 
 $(BIN)/updater: Makefile
 	@mkdir -p $(@D)
-	GOBIN=$(abspath $(@D)) GOPRIVATE=github.com/grafana/deployment_tools $(GO) install github.com/grafana/deployment_tools/drone/plugins/cmd/updater@d64d509
+	GOBIN=$(abspath $(@D)) GOPRIVATE=github.com/grafana/deployment_tools $(GO) install github.com/grafana/deployment_tools/docker/updater/cmd/updater@bd5794b4e488
 
 # Note: When updating the goreleaser version also update .github/workflow/release.yml and .git/workflow/weekly-release.yaml
 $(BIN)/goreleaser: Makefile go.mod

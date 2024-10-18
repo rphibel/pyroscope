@@ -45,6 +45,7 @@ import (
 	"github.com/grafana/pyroscope/pkg/distributor"
 	"github.com/grafana/pyroscope/pkg/embedded/grafana"
 	compactionworker "github.com/grafana/pyroscope/pkg/experiment/compactor"
+	adaptiveplacement "github.com/grafana/pyroscope/pkg/experiment/distributor/placement/adaptive_placement"
 	segmentwriter "github.com/grafana/pyroscope/pkg/experiment/ingester"
 	segmentwriterclient "github.com/grafana/pyroscope/pkg/experiment/ingester/client"
 	"github.com/grafana/pyroscope/pkg/experiment/metastore"
@@ -68,7 +69,6 @@ import (
 	"github.com/grafana/pyroscope/pkg/usagestats"
 	"github.com/grafana/pyroscope/pkg/util"
 	"github.com/grafana/pyroscope/pkg/util/cli"
-	"github.com/grafana/pyroscope/pkg/util/health"
 	"github.com/grafana/pyroscope/pkg/validation"
 	"github.com/grafana/pyroscope/pkg/validation/exporter"
 )
@@ -108,11 +108,12 @@ type Config struct {
 	// TODO(kolesnikovae):
 	//  - Generalized experimental features?
 	//  - Better naming.
-	v2Experiment     bool
-	SegmentWriter    segmentwriter.Config    `yaml:"segment_writer" doc:"hidden"`
-	Metastore        metastore.Config        `yaml:"metastore" doc:"hidden"`
-	QueryBackend     querybackend.Config     `yaml:"query_backend" doc:"hidden"`
-	CompactionWorker compactionworker.Config `yaml:"compaction_worker" doc:"hidden"`
+	v2Experiment      bool
+	SegmentWriter     segmentwriter.Config     `yaml:"segment_writer" doc:"hidden"`
+	Metastore         metastore.Config         `yaml:"metastore" doc:"hidden"`
+	QueryBackend      querybackend.Config      `yaml:"query_backend" doc:"hidden"`
+	CompactionWorker  compactionworker.Config  `yaml:"compaction_worker" doc:"hidden"`
+	AdaptivePlacement adaptiveplacement.Config `yaml:"adaptive_placement" doc:"hidden"`
 }
 
 func newDefaultConfig() *Config {
@@ -134,6 +135,7 @@ type SelfProfilingConfig struct {
 	DisablePush          bool `yaml:"disable_push,omitempty"`
 	MutexProfileFraction int  `yaml:"mutex_profile_fraction,omitempty"`
 	BlockProfileRate     int  `yaml:"block_profile_rate,omitempty"`
+	UseK6Middleware      bool `yaml:"use_k6_middleware,omitempty"`
 }
 
 func (c *SelfProfilingConfig) RegisterFlags(f *flag.FlagSet) {
@@ -141,6 +143,7 @@ func (c *SelfProfilingConfig) RegisterFlags(f *flag.FlagSet) {
 	f.IntVar(&c.MutexProfileFraction, "self-profiling.mutex-profile-fraction", 5, "")
 	f.IntVar(&c.BlockProfileRate, "self-profiling.block-profile-rate", 5, "")
 	f.BoolVar(&c.DisablePush, "self-profiling.disable-push", false, "When running in single binary (--target=all) Pyroscope will push (Go SDK) profiles to itself. Set to true to disable self-profiling.")
+	f.BoolVar(&c.UseK6Middleware, "self-profiling.use-k6-middleware", false, "Read k6 labels from request headers and set them as dynamic profile tags.")
 }
 
 func (c *Config) RegisterFlags(f *flag.FlagSet) {
@@ -204,6 +207,7 @@ func (c *Config) registerServerFlagsWithChangedDefaultValues(fs *flag.FlagSet) {
 			"segment-writer.num-tokens":                         "4",
 			"segment-writer.heartbeat-timeout":                  "1m",
 			"segment-writer.unregister-on-shutdown":             "false",
+			"segment-writer.min-ready-duration":                 "30s",
 		} {
 			overrides[k] = v
 		}
@@ -212,8 +216,10 @@ func (c *Config) registerServerFlagsWithChangedDefaultValues(fs *flag.FlagSet) {
 		c.SegmentWriter.RegisterFlags(throwaway)
 		c.QueryBackend.RegisterFlags(throwaway)
 		c.CompactionWorker.RegisterFlags(throwaway)
+		c.AdaptivePlacement.RegisterFlags(throwaway)
 		c.LimitsConfig.WritePathOverrides.RegisterFlags(throwaway)
 		c.LimitsConfig.ReadPathOverrides.RegisterFlags(throwaway)
+		c.LimitsConfig.AdaptivePlacementLimits.RegisterFlags(throwaway)
 	}
 
 	throwaway.VisitAll(func(f *flag.Flag) {
@@ -294,13 +300,12 @@ type Phlare struct {
 	segmentWriter       *segmentwriter.SegmentWriterService
 	segmentWriterClient *segmentwriterclient.Client
 	segmentWriterRing   *ring.Ring
+	placementAgent      *adaptiveplacement.Agent
+	placementManager    *adaptiveplacement.Manager
 	metastore           *metastore.Metastore
 	metastoreClient     *metastoreclient.Client
-	//nolint:unused
-	queryBackend       *querybackend.QueryBackend
-	queryBackendClient *querybackendclient.Client
-	compactionWorker   *compactionworker.Worker
-	healthService      health.Service
+	queryBackendClient  *querybackendclient.Client
+	compactionWorker    *compactionworker.Worker
 }
 
 func New(cfg Config) (*Phlare, error) {
@@ -309,10 +314,9 @@ func New(cfg Config) (*Phlare, error) {
 	usagestats.Edition("oss")
 
 	phlare := &Phlare{
-		Cfg:           cfg,
-		logger:        logger,
-		reg:           prometheus.DefaultRegisterer,
-		healthService: health.NoOpService,
+		Cfg:    cfg,
+		logger: logger,
+		reg:    prometheus.DefaultRegisterer,
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -326,7 +330,11 @@ func New(cfg Config) (*Phlare, error) {
 
 	if cfg.Tracing.Enabled {
 		// Setting the environment variable JAEGER_AGENT_HOST enables tracing
-		trace, err := wwtracing.NewFromEnv(fmt.Sprintf("pyroscope-%s", cfg.Target))
+		name := os.Getenv("JAEGER_SERVICE_NAME")
+		if name == "" {
+			name = fmt.Sprintf("pyroscope-%s", cfg.Target)
+		}
+		trace, err := wwtracing.NewFromEnv(name)
 		if err != nil {
 			level.Error(logger).Log("msg", "error in initializing tracing. tracing will not be enabled", "err", err)
 		}
@@ -400,18 +408,19 @@ func (f *Phlare) setupModuleManager() error {
 	if f.Cfg.v2Experiment {
 		experimentalModules := map[string][]string{
 			SegmentWriter:       {Overrides, API, MemberlistKV, Storage, UsageReport, MetastoreClient},
-			Metastore:           {Overrides, API, MetastoreClient},
+			Metastore:           {Overrides, API, MetastoreClient, Storage, PlacementManager},
 			CompactionWorker:    {Overrides, API, Storage, Overrides, MetastoreClient},
 			QueryBackend:        {Overrides, API, Storage, Overrides, QueryBackendClient},
 			SegmentWriterRing:   {Overrides, API, MemberlistKV},
-			SegmentWriterClient: {SegmentWriterRing},
-			HealthService:       {API},
+			SegmentWriterClient: {Overrides, API, SegmentWriterRing, PlacementAgent},
+			PlacementAgent:      {Overrides, API, Storage},
+			PlacementManager:    {Overrides, API, Storage},
 		}
 		for k, v := range experimentalModules {
 			deps[k] = v
 		}
 
-		deps[All] = append(deps[All], SegmentWriter, Metastore, CompactionWorker, QueryBackend, HealthService)
+		deps[All] = append(deps[All], SegmentWriter, Metastore, CompactionWorker, QueryBackend)
 		deps[QueryFrontend] = append(deps[QueryFrontend], MetastoreClient, QueryBackendClient)
 		deps[Distributor] = append(deps[Distributor], SegmentWriterClient)
 
@@ -423,7 +432,8 @@ func (f *Phlare) setupModuleManager() error {
 		mm.RegisterModule(QueryBackend, f.initQueryBackend)
 		mm.RegisterModule(MetastoreClient, f.initMetastoreClient, modules.UserInvisibleModule)
 		mm.RegisterModule(QueryBackendClient, f.initQueryBackendClient, modules.UserInvisibleModule)
-		mm.RegisterModule(HealthService, f.initHealthService, modules.UserInvisibleModule)
+		mm.RegisterModule(PlacementAgent, f.initPlacementAgent, modules.UserInvisibleModule)
+		mm.RegisterModule(PlacementManager, f.initPlacementManager, modules.UserInvisibleModule)
 	}
 
 	for mod, targets := range deps {

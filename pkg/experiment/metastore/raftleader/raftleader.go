@@ -1,8 +1,6 @@
 package raftleader
 
 import (
-	"sync"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/go-kit/log"
@@ -10,18 +8,23 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-type HealthObserver struct {
-	logger     log.Logger
-	mu         sync.Mutex
-	registered map[serviceKey]*raftService
-	metrics    *Metrics
+type LeaderObserver struct {
+	logger   log.Logger
+	metrics  *metrics
+	raft     *raft.Raft
+	observer *raft.Observer
+	c        chan raft.Observation
+	stop     chan struct{}
+	done     chan struct{}
+	cb       func(st raft.RaftState)
 }
-type Metrics struct {
+
+type metrics struct {
 	status prometheus.Gauge
 }
 
-func NewMetrics(reg prometheus.Registerer) *Metrics {
-	m := &Metrics{
+func newMetrics(reg prometheus.Registerer) *metrics {
+	m := &metrics{
 		status: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "pyroscope",
 			Name:      "metastore_raft_status",
@@ -33,87 +36,58 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	return m
 }
 
-func NewRaftLeaderHealthObserver(logger log.Logger, m *Metrics) *HealthObserver {
-	return &HealthObserver{
-		logger:     logger,
-		metrics:    m,
-		registered: make(map[serviceKey]*raftService),
-	}
-}
-
-func (hs *HealthObserver) Register(r *raft.Raft, service string) {
-	hs.mu.Lock()
-	defer hs.mu.Unlock()
-	k := serviceKey{raft: r, service: service}
-	if _, ok := hs.registered[k]; ok {
-		return
-	}
-	svc := &raftService{
-		hs:      hs,
-		logger:  log.With(hs.logger, "service", service),
-		service: service,
-		raft:    r,
+func NewRaftLeaderHealthObserver(logger log.Logger, reg prometheus.Registerer) *LeaderObserver {
+	return &LeaderObserver{
+		logger:  logger,
+		metrics: newMetrics(reg),
 		c:       make(chan raft.Observation, 1),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
 	}
-	_ = level.Debug(svc.logger).Log("msg", "registering health check")
-	svc.updateStatus()
-	go svc.run()
-	svc.observer = raft.NewObserver(svc.c, true, func(o *raft.Observation) bool {
+}
+
+func (o *LeaderObserver) Register(r *raft.Raft, cb func(st raft.RaftState)) {
+	if o.raft != nil {
+		return
+	}
+	o.raft = r
+	o.cb = cb
+	_ = level.Debug(o.logger).Log("msg", "registering leader observer")
+	o.updateStatus()
+	go o.run()
+	o.observer = raft.NewObserver(o.c, true, func(o *raft.Observation) bool {
 		_, ok := o.Data.(raft.LeaderObservation)
 		return ok
 	})
-	r.RegisterObserver(svc.observer)
-	hs.registered[k] = svc
+	r.RegisterObserver(o.observer)
 }
 
-func (hs *HealthObserver) Deregister(r *raft.Raft, service string) {
-	hs.mu.Lock()
-	k := serviceKey{raft: r, service: service}
-	svc, ok := hs.registered[k]
-	delete(hs.registered, k)
-	hs.mu.Unlock()
-	if ok {
-		close(svc.stop)
-		<-svc.done
-	}
+func (o *LeaderObserver) Deregister() {
+	close(o.stop)
+	<-o.done
+	_ = level.Debug(o.logger).Log("msg", "deregistering raft observer")
+	o.raft.DeregisterObserver(o.observer)
 }
 
-type serviceKey struct {
-	raft    *raft.Raft
-	service string
-}
-
-type raftService struct {
-	hs       *HealthObserver
-	logger   log.Logger
-	service  string
-	raft     *raft.Raft
-	observer *raft.Observer
-	c        chan raft.Observation
-	stop     chan struct{}
-	done     chan struct{}
-}
-
-func (svc *raftService) run() {
+func (o *LeaderObserver) run() {
 	defer func() {
-		close(svc.done)
+		close(o.done)
 	}()
 	for {
 		select {
-		case <-svc.c:
-			svc.updateStatus()
-		case <-svc.stop:
-			_ = level.Debug(svc.logger).Log("msg", "deregistering health check")
-			svc.raft.DeregisterObserver(svc.observer)
+		case <-o.c:
+			o.updateStatus()
+		case <-o.stop:
 			return
 		}
 	}
 }
 
-func (svc *raftService) updateStatus() {
-	state := svc.raft.State()
-	svc.hs.metrics.status.Set(float64(state))
-	_ = level.Info(svc.logger).Log("msg", "updated raft state", "state", state)
+func (o *LeaderObserver) updateStatus() {
+	state := o.raft.State()
+	if o.cb != nil {
+		o.cb(state)
+	}
+	o.metrics.status.Set(float64(state))
+	_ = level.Info(o.logger).Log("msg", "updated raft state", "state", state)
 }
