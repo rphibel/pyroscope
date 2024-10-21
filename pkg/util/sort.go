@@ -19,7 +19,11 @@ func UniqueSortSummaries(summaries []*typesv1.LabelSummary) []*typesv1.LabelSumm
 
 	summaries = summaries[:0]
 	for _, sums := range uniqueSummaries {
-		if len(sums) < 2 {
+		if len(sums) == 0 {
+			continue
+		}
+
+		if len(sums) == 1 {
 			summaries = append(summaries, sums[0])
 			continue
 		}
@@ -29,6 +33,7 @@ func UniqueSortSummaries(summaries []*typesv1.LabelSummary) []*typesv1.LabelSumm
 			sums[0].Values = append(sums[0].Values, sums[i].Values...)
 		}
 		sums[0].Values = slices.Compact(sums[0].Values)
+		summaries = append(summaries, sums[0])
 	}
 
 	sorter := labelSummarySorter(summaries)
