@@ -32,6 +32,8 @@ func UniqueSortSummaries(summaries []*typesv1.LabelSummary) []*typesv1.LabelSumm
 		for i := 1; i < len(sums); i++ {
 			sums[0].Values = append(sums[0].Values, sums[i].Values...)
 		}
+
+		slices.Sort(sums[0].Values)
 		sums[0].Values = slices.Compact(sums[0].Values)
 		summaries = append(summaries, sums[0])
 	}
