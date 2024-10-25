@@ -30,6 +30,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/genproto/googleapis/api/httpbody"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
 
@@ -99,6 +100,7 @@ const (
 	CompactionWorker    string = "compaction-worker"
 	PlacementAgent      string = "placement-agent"
 	PlacementManager    string = "placement-manager"
+	HealthServer        string = "health-server"
 )
 
 var objectStoreTypeStats = usagestats.NewString("store_object_type")
@@ -502,7 +504,7 @@ func (f *Phlare) initServer() (services.Service, error) {
 	// see https://github.com/grafana/pyroscope/issues/231
 	f.Cfg.Server.DoNotAddDefaultHTTPMiddleware = true
 	f.Cfg.Server.ExcludeRequestInLog = true // gRPC-specific.
-	f.Cfg.Server.GRPCMiddleware = append(f.Cfg.Server.GRPCMiddleware, util.GRPCRecoveryInterceptor)
+	f.Cfg.Server.GRPCMiddleware = append(f.Cfg.Server.GRPCMiddleware, util.RecoveryInterceptorGRPC)
 
 	f.setupWorkerTimeout()
 	if f.isModuleActive(QueryScheduler) {
@@ -516,6 +518,9 @@ func (f *Phlare) initServer() (services.Service, error) {
 	}
 
 	f.Server = serv
+	if f.Cfg.v2Experiment {
+		grpc_health_v1.RegisterHealthServer(f.Server.GRPC, f.healthServer)
+	}
 
 	servicesToWaitFor := func() []services.Service {
 		svs := []services.Service(nil)
@@ -753,9 +758,9 @@ func NewServerService(serv *server.Server, servicesToWaitFor func() []services.S
 			return nil
 		case err := <-serverDone:
 			if err != nil {
-				return err
+				return fmt.Errorf("server stopped unexpectedly: %w", err)
 			}
-			return fmt.Errorf("server stopped unexpectedly")
+			return nil
 		}
 	}
 

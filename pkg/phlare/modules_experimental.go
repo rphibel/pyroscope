@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/dskit/ring"
 	"github.com/grafana/dskit/services"
 	"github.com/prometheus/client_golang/prometheus"
+	grpchealth "google.golang.org/grpc/health"
 
 	compactionworker "github.com/grafana/pyroscope/pkg/experiment/compactor"
 	adaptiveplacement "github.com/grafana/pyroscope/pkg/experiment/distributor/placement/adaptive_placement"
@@ -18,6 +19,7 @@ import (
 	"github.com/grafana/pyroscope/pkg/experiment/metastore/discovery"
 	querybackend "github.com/grafana/pyroscope/pkg/experiment/query_backend"
 	querybackendclient "github.com/grafana/pyroscope/pkg/experiment/query_backend/client"
+	"github.com/grafana/pyroscope/pkg/util/health"
 )
 
 func (f *Phlare) initSegmentWriterRing() (_ services.Service, err error) {
@@ -44,17 +46,22 @@ func (f *Phlare) initSegmentWriter() (services.Service, error) {
 	if err := f.Cfg.SegmentWriter.Validate(); err != nil {
 		return nil, err
 	}
+
+	logger := log.With(f.logger, "component", "segment-writer")
+	healthService := health.NewGRPCHealthService(f.healthServer, logger, "pyroscope.segment-writer")
 	segmentWriter, err := segmentwriter.New(
 		f.reg,
-		f.logger,
+		logger,
 		f.Cfg.SegmentWriter,
 		f.Overrides,
+		healthService,
 		f.storageBucket,
 		f.metastoreClient,
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	f.segmentWriter = segmentWriter
 	f.API.RegisterSegmentWriter(segmentWriter)
 	return f.segmentWriter, nil
@@ -100,11 +107,14 @@ func (f *Phlare) initMetastore() (services.Service, error) {
 	if err := f.Cfg.Metastore.Validate(); err != nil {
 		return nil, err
 	}
+
 	logger := log.With(f.logger, "component", "metastore")
+	healthService := health.NewGRPCHealthService(f.healthServer, logger, "pyroscope.metastore")
 	m, err := metastore.New(
 		f.Cfg.Metastore,
 		logger,
 		f.reg,
+		healthService,
 		f.metastoreClient,
 		f.storageBucket,
 		f.placementManager,
@@ -112,6 +122,7 @@ func (f *Phlare) initMetastore() (services.Service, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	f.API.RegisterMetastore(m)
 	f.metastore = m
 	return m.Service(), nil
@@ -197,4 +208,9 @@ func (f *Phlare) adaptivePlacementStore() adaptiveplacement.Store {
 		return adaptiveplacement.NewEmptyStore()
 	}
 	return adaptiveplacement.NewStore(f.storageBucket)
+}
+
+func (f *Phlare) initHealthServer() (services.Service, error) {
+	f.healthServer = grpchealth.NewServer()
+	return nil, nil
 }

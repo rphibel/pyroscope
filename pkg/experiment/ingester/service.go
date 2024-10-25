@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/go-kit/log"
@@ -28,6 +27,7 @@ import (
 	"github.com/grafana/pyroscope/pkg/pprof"
 	"github.com/grafana/pyroscope/pkg/tenant"
 	"github.com/grafana/pyroscope/pkg/util"
+	"github.com/grafana/pyroscope/pkg/util/health"
 	"github.com/grafana/pyroscope/pkg/validation"
 )
 
@@ -39,8 +39,7 @@ const (
 type Config struct {
 	GRPCClientConfig grpcclient.Config     `yaml:"grpc_client_config" doc:"description=Configures the gRPC client used to communicate with the segment writer."`
 	LifecyclerConfig ring.LifecyclerConfig `yaml:"lifecycler,omitempty"`
-	SegmentDuration  time.Duration         `yaml:"segmentDuration,omitempty"`
-	Async            bool                  `yaml:"async,omitempty"` //todo make it pertenant
+	SegmentDuration  time.Duration         `yaml:"segment_duration,omitempty"`
 }
 
 // RegisterFlags registers the flags.
@@ -48,8 +47,7 @@ func (cfg *Config) RegisterFlags(f *flag.FlagSet) {
 	const prefix = "segment-writer"
 	cfg.GRPCClientConfig.RegisterFlagsWithPrefix(prefix, f)
 	cfg.LifecyclerConfig.RegisterFlagsWithPrefix(prefix+".", f, util.Logger)
-	f.DurationVar(&cfg.SegmentDuration, prefix+".segment.duration", 500*time.Millisecond, "Timeout when flushing segments to bucket.")
-	f.BoolVar(&cfg.Async, prefix+".async", false, "Enable async mode for segment writer.")
+	f.DurationVar(&cfg.SegmentDuration, prefix+".segment-duration", 500*time.Millisecond, "Timeout when flushing segments to bucket.")
 }
 
 func (cfg *Config) Validate() error {
@@ -69,12 +67,13 @@ type SegmentWriterService struct {
 	services.Service
 	segmentwriterv1.UnimplementedSegmentWriterServiceServer
 
-	cfg      Config
+	config   Config
 	dbConfig phlaredb.Config
 	logger   log.Logger
 	reg      prometheus.Registerer
+	health   health.Service
 
-	requests           requests
+	requests           util.InflightRequests
 	lifecycler         *ring.Lifecycler
 	subservices        *services.Manager
 	subservicesWatcher *services.FailureWatcher
@@ -83,39 +82,33 @@ type SegmentWriterService struct {
 	segmentWriter *segmentsWriter
 }
 
-type ingesterFlusherCompat struct {
-	*SegmentWriterService
-}
-
-func (i *ingesterFlusherCompat) Flush() {
-	err := i.SegmentWriterService.Flush()
-	if err != nil {
-		level.Error(i.SegmentWriterService.logger).Log("msg", "flush failed", "err", err)
-	}
-}
-
 func New(
 	reg prometheus.Registerer,
-	log log.Logger,
-	cfg Config,
-	lim Limits,
+	logger log.Logger,
+	config Config,
+	limits Limits,
+	health health.Service,
 	storageBucket phlareobj.Bucket,
 	metastoreClient *metastoreclient.Client,
 ) (*SegmentWriterService, error) {
 	i := &SegmentWriterService{
-		cfg:           cfg,
-		logger:        log,
+		config:        config,
+		logger:        logger,
 		reg:           reg,
+		health:        health,
 		storageBucket: storageBucket,
 	}
 
+	// The lifecycler is only used for discovery: it maintains the state of the
+	// instance in the ring and nothing more. Flush is managed explicitly at
+	// shutdown, and data/state transfer is not required.
 	var err error
 	i.lifecycler, err = ring.NewLifecycler(
-		cfg.LifecyclerConfig,
-		&ingesterFlusherCompat{i},
+		config.LifecyclerConfig,
+		noOpTransferFlush{},
 		RingName,
 		RingKey,
-		true,
+		false,
 		i.logger, prometheus.WrapRegistererWithPrefix("pyroscope_segment_writer_", i.reg))
 	if err != nil {
 		return nil, err
@@ -131,10 +124,9 @@ func New(
 	if metastoreClient == nil {
 		return nil, errors.New("metastore client is required for segment writer")
 	}
-	segmentMetrics := newSegmentMetrics(i.reg)
+	metrics := newSegmentMetrics(i.reg)
 	headMetrics := memdb.NewHeadMetricsWithPrefix(reg, "pyroscope_segment_writer")
-	config := segmentWriterConfig{segmentDuration: cfg.SegmentDuration}
-	i.segmentWriter = newSegmentWriter(i.logger, segmentMetrics, headMetrics, config, lim, storageBucket, metastoreClient)
+	i.segmentWriter = newSegmentWriter(i.logger, metrics, headMetrics, config, limits, storageBucket, metastoreClient)
 	i.subservicesWatcher = services.NewFailureWatcher()
 	i.subservicesWatcher.WatchManager(i.subservices)
 	i.Service = services.NewBasicService(i.starting, i.running, i.stopping)
@@ -145,7 +137,13 @@ func (i *SegmentWriterService) starting(ctx context.Context) error {
 	if err := services.StartManagerAndAwaitHealthy(ctx, i.subservices); err != nil {
 		return err
 	}
-	i.requests.open()
+	// The instance is ready to handle incoming requests.
+	// We do not have to wait for the lifecycler: its readiness check
+	// is only used to limit the number of instances that can be coming
+	// or going at any one time, by only returning true if all instances
+	// are active.
+	i.requests.Open()
+	i.health.SetServing()
 	return nil
 }
 
@@ -159,7 +157,8 @@ func (i *SegmentWriterService) running(ctx context.Context) error {
 }
 
 func (i *SegmentWriterService) stopping(_ error) error {
-	i.requests.drain()
+	i.health.SetNotServing()
+	i.requests.Drain()
 	errs := multierror.New()
 	errs.Add(services.StopManagerAndAwaitStopped(context.Background(), i.subservices))
 	errs.Add(i.segmentWriter.Stop())
@@ -167,11 +166,14 @@ func (i *SegmentWriterService) stopping(_ error) error {
 }
 
 func (i *SegmentWriterService) Push(ctx context.Context, req *segmentwriterv1.PushRequest) (*segmentwriterv1.PushResponse, error) {
-	if !i.requests.add() {
+	if !i.requests.Add() {
 		return nil, status.Error(codes.Unavailable, "service is unavailable")
 	} else {
-		defer i.requests.done()
+		defer func() {
+			i.requests.Done()
+		}()
 	}
+
 	if req.TenantId == "" {
 		return nil, status.Error(codes.InvalidArgument, tenant.ErrNoTenantID.Error())
 	}
@@ -185,11 +187,8 @@ func (i *SegmentWriterService) Push(ctx context.Context, req *segmentwriterv1.Pu
 	}
 
 	wait := i.segmentWriter.ingest(shardKey(req.Shard), func(segment segmentIngest) {
-		segment.ingest(ctx, req.TenantId, p.Profile, id, req.Labels)
+		segment.ingest(req.TenantId, p.Profile, id, req.Labels)
 	})
-	if i.cfg.Async {
-		return &segmentwriterv1.PushResponse{}, nil
-	}
 
 	flushStarted := time.Now()
 	defer func() {
@@ -221,15 +220,7 @@ func (i *SegmentWriterService) Push(ctx context.Context, req *segmentwriterv1.Pu
 	}
 }
 
-func (i *SegmentWriterService) Flush() error {
-	return i.segmentWriter.Stop()
-}
-
-func (i *SegmentWriterService) TransferOut(ctx context.Context) error {
-	return ring.ErrTransferDisabled
-}
-
-// CheckReady is used to indicate to k8s when the ingesters are ready for
+// CheckReady is used to indicate when the ingesters are ready for
 // the addition removal of another ingester. Returns 204 when the ingester is
 // ready, 500 otherwise.
 func (i *SegmentWriterService) CheckReady(ctx context.Context) error {
@@ -239,58 +230,7 @@ func (i *SegmentWriterService) CheckReady(ctx context.Context) error {
 	return i.lifecycler.CheckReady(ctx)
 }
 
-// The requests utility emerged due to the need to handle request draining at
-// the service level.
-//
-// Ideally, this should be the responsibility of the server using the service.
-// However, since the server is a dependency of the service and is only
-// shut down after the service is stopped, requests may still arrive
-// after the Stop call. This issue arises from how we initialize modules.
-//
-// In other scenarios, request draining could be managed at a higher level,
-// such as in a load balancer or service discovery mechanism. The goal would
-// be to stop routing requests to an instance that is about to shut down.
-//
-// In our case, segment writer service instances are not directly exposed to
-// the outside world but are discoverable via the ring (see lifecycler).
-// There's no _reliable_ mechanism to ensure that all the ring members are
-// aware of fact that the instance is leaving, so requests may continue to
-// arrive within a short period of time, until the membership state converges.
-type requests struct {
-	mu      sync.RWMutex
-	wg      sync.WaitGroup
-	allowed bool // Indicates if new requests are allowed
-}
+type noOpTransferFlush struct{}
 
-// open allows new requests to be accepted.
-func (r *requests) open() {
-	r.mu.Lock()
-	r.allowed = true
-	r.mu.Unlock()
-}
-
-// add increments the WaitGroup if new requests are allowed.
-// Returns true if the request was accepted, false otherwise.
-func (r *requests) add() bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if !r.allowed {
-		return false
-	}
-	r.wg.Add(1)
-	return true
-}
-
-// done decrements the WaitGroup, indicating a request has completed.
-func (r *requests) done() {
-	r.wg.Done()
-}
-
-// drain prevents new requests from being accepted and waits for
-// all ongoing requests to complete.
-func (r *requests) drain() {
-	r.mu.Lock()
-	r.allowed = false
-	r.mu.Unlock()
-	r.wg.Wait()
-}
+func (noOpTransferFlush) Flush()                            {}
+func (noOpTransferFlush) TransferOut(context.Context) error { return ring.ErrTransferDisabled }
