@@ -1120,7 +1120,7 @@ func uniqueSortedLabels(responses []ResponseFromReplica[[]*typesv1.LabelValues])
 		unwrappedResponses = append(unwrappedResponses, r.response)
 	}
 
-	return util.SortLabels(unwrappedResponses)
+	return util.UniqueSortLabels(unwrappedResponses)
 }
 
 func (q *Querier) selectSpanProfile(ctx context.Context, req *querierv1.SelectMergeSpanProfileRequest) (*phlaremodel.Tree, error) {

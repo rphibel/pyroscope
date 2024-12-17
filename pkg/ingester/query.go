@@ -23,6 +23,13 @@ func (i *Ingester) LabelNames(ctx context.Context, req *connect.Request[typesv1.
 	})
 }
 
+// Labels returns all the possible label names and their corresponding values.
+func (i *Ingester) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
+	return forInstanceUnary(ctx, i, func(instance *instance) (*connect.Response[typesv1.LabelsResponse], error) {
+		return instance.Labels(ctx, req)
+	})
+}
+
 // ProfileTypes returns the possible profile types.
 func (i *Ingester) ProfileTypes(ctx context.Context, req *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error) {
 	return forInstanceUnary(ctx, i, func(instance *instance) (*connect.Response[ingestv1.ProfileTypesResponse], error) {

@@ -7,7 +7,7 @@ import (
 	typesv1 "github.com/grafana/pyroscope/api/gen/proto/go/types/v1"
 )
 
-func SortLabels(responses [][]*typesv1.LabelValues) []*typesv1.LabelValues {
+func UniqueSortLabels(responses [][]*typesv1.LabelValues) []*typesv1.LabelValues {
 	// Merge label names and their values, deduplicating along the way.
 	unique := make(map[string]map[string]struct{})
 	for _, response := range responses {

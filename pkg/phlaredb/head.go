@@ -327,6 +327,43 @@ func (h *Head) LabelNames(ctx context.Context, req *connect.Request[typesv1.Labe
 	}), nil
 }
 
+func (h *Head) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error) {
+	names, err := h.LabelNames(ctx, &connect.Request[typesv1.LabelNamesRequest]{
+		Msg: &typesv1.LabelNamesRequest{
+			Matchers: req.Matchers,
+			Start:    req.Start,
+			End:      req.End,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	labels := make([]*typesv1.LabelValues, 0, len(names.Msg.Names))
+	for _, name := range names.Msg.Names {
+		values, err := h.LabelValues(ctx, &connect.Request[typesv1.LabelValuesRequest]{
+			Msg: &typesv1.LabelValuesRequest{
+				Name:  name,
+				Start: req.Start,
+				End:   req.End,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		labels = append(labels, &typesv1.LabelValues{
+			Name:   name,
+			Values: values.Msg.Names,
+		})
+	}
+
+	res := &typesv1.LabelsResponse{
+		Labels: labels,
+	}
+	return res, nil
+}
+
 func (h *Head) MustProfileTypeNames() []string {
 	ptypes, err := h.profiles.index.ix.LabelValues(phlaremodel.LabelNameProfileType, nil)
 	if err != nil {

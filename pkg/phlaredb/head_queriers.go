@@ -245,6 +245,10 @@ func (q *headOnDiskQuerier) LabelNames(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&typesv1.LabelNamesResponse{}), nil
 }
 
+func (q *headOnDiskQuerier) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error) {
+	return &typesv1.LabelsResponse{}, nil
+}
+
 func (q *headOnDiskQuerier) MergeByStacktraces(ctx context.Context, rows iter.Iterator[Profile], maxNodes int64) (*phlaremodel.Tree, error) {
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "MergeByStacktraces")
 	defer sp.Finish()
@@ -549,6 +553,10 @@ func (q *headInMemoryQuerier) LabelValues(ctx context.Context, req *connect.Requ
 
 func (q *headInMemoryQuerier) LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error) {
 	return q.head.LabelNames(ctx, req)
+}
+
+func (q *headInMemoryQuerier) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error) {
+	return q.head.Labels(ctx, req)
 }
 
 func (q *headInMemoryQuerier) MergeByStacktraces(ctx context.Context, rows iter.Iterator[Profile], maxNodes int64) (*phlaremodel.Tree, error) {

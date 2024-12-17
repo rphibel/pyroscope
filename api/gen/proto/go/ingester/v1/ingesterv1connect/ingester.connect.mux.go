@@ -34,6 +34,11 @@ func RegisterIngesterServiceHandler(mux *mux.Router, svc IngesterServiceHandler,
 		svc.LabelNames,
 		opts...,
 	))
+	mux.Handle("/ingester.v1.IngesterService/Labels", connect.NewUnaryHandler(
+		"/ingester.v1.IngesterService/Labels",
+		svc.Labels,
+		opts...,
+	))
 	mux.Handle("/ingester.v1.IngesterService/ProfileTypes", connect.NewUnaryHandler(
 		"/ingester.v1.IngesterService/ProfileTypes",
 		svc.ProfileTypes,

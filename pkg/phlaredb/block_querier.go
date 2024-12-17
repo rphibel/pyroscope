@@ -522,6 +522,80 @@ func (b *singleBlockQuerier) LabelNames(ctx context.Context, req *connect.Reques
 	}), nil
 }
 
+func (b *singleBlockQuerier) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels Block")
+	defer sp.Finish()
+
+	if err := b.Open(ctx); err != nil {
+		return nil, err
+	}
+	b.queries.Add(1)
+	defer b.queries.Done()
+
+	selectors, err := parseSelectors(req.Matchers)
+	if err != nil {
+		return nil, err
+	}
+
+	names := []string{}
+	if selectors.matchesAll() {
+		names, err = b.index.LabelNames()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var iters []index.Postings
+		for _, matchers := range selectors {
+			iter, err := PostingsForMatchers(b.index, nil, matchers...)
+			if err != nil {
+				return nil, err
+			}
+			iters = append(iters, iter)
+		}
+
+		nameSet := make(map[string]struct{})
+		iter := index.Intersect(iters...)
+		for iter.Next() {
+			names, err := b.index.LabelNamesFor(iter.At())
+			if err != nil {
+				if err == storage.ErrNotFound {
+					continue
+				}
+				return nil, err
+			}
+
+			for _, name := range names {
+				nameSet[name] = struct{}{}
+			}
+		}
+
+		for name := range nameSet {
+			names = append(names, name)
+		}
+	}
+
+	labels := make([]*typesv1.LabelValues, 0, len(names))
+	for _, name := range names {
+		values, err := b.index.LabelValues(name)
+		if err != nil {
+			if err == storage.ErrNotFound {
+				continue
+			}
+			return nil, err
+		}
+
+		labels = append(labels, &typesv1.LabelValues{
+			Name:   name,
+			Values: values,
+		})
+	}
+
+	res := &typesv1.LabelsResponse{
+		Labels: labels,
+	}
+	return res, nil
+}
+
 func (b *singleBlockQuerier) BlockID() string {
 	return b.meta.ULID.String()
 }
@@ -598,6 +672,7 @@ type Querier interface {
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	LabelValues(ctx context.Context, req *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error)
 }
 
 type TimeBounded interface {
@@ -618,6 +693,7 @@ func InRange(q TimeBounded, start, end model.Time) bool {
 type ReadAPI interface {
 	LabelValues(context.Context, *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error)
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	Series(context.Context, *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error)
 	MergeProfilesStacktraces(context.Context, *connect.BidiStream[ingestv1.MergeProfilesStacktracesRequest, ingestv1.MergeProfilesStacktracesResponse]) error
@@ -677,6 +753,22 @@ func (queriers Queriers) LabelNames(ctx context.Context, req *connect.Request[ty
 		}
 	}
 	res, err := LabelNames(ctx, req, blockGetter)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(res), nil
+}
+
+func (queriers Queriers) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
+	blockGetter := queriers.ForTimeRange
+	_, hasTimeRange := phlaremodel.GetTimeRange(req.Msg)
+	if !hasTimeRange {
+		blockGetter = func(_ context.Context, _, _ model.Time, _ *ingestv1.Hints) (Queriers, error) {
+			return queriers, nil
+		}
+	}
+
+	res, err := Labels(ctx, req.Msg, blockGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -1433,6 +1525,44 @@ func LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequ
 	return &typesv1.LabelNamesResponse{
 		Names: lo.Uniq(labelNames),
 	}, nil
+}
+
+func Labels(ctx context.Context, req *typesv1.LabelsRequest, blockGetter BlockGetter) (*typesv1.LabelsResponse, error) {
+	queriers, err := blockGetter(ctx, model.Time(req.Start), model.Time(req.End), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var responses [][]*typesv1.LabelValues
+	var lock sync.Mutex
+	group, ctx := errgroup.WithContext(ctx)
+
+	const concurrentQueryLimit = 50
+	group.SetLimit(concurrentQueryLimit)
+
+	for _, q := range queriers {
+		group.Go(util.RecoverPanic(func() error {
+			res, err := q.Labels(ctx, req)
+			if err != nil {
+				return err
+			}
+
+			lock.Lock()
+			responses = append(responses, res.Labels)
+			lock.Unlock()
+			return nil
+		}))
+	}
+
+	err = group.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &typesv1.LabelsResponse{
+		Labels: util.UniqueSortLabels(responses),
+	}
+	return res, nil
 }
 
 func Series(ctx context.Context, req *ingestv1.SeriesRequest, blockGetter BlockGetter) (*ingestv1.SeriesResponse, error) {
