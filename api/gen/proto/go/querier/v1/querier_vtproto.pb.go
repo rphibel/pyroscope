@@ -1232,6 +1232,8 @@ type QuerierServiceClient interface {
 	LabelValues(ctx context.Context, in *v1.LabelValuesRequest, opts ...grpc.CallOption) (*v1.LabelValuesResponse, error)
 	// LabelNames returns a list of the existing label names.
 	LabelNames(ctx context.Context, in *v1.LabelNamesRequest, opts ...grpc.CallOption) (*v1.LabelNamesResponse, error)
+	// Labels returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
+	Labels(ctx context.Context, in *v1.LabelsRequest, opts ...grpc.CallOption) (*v1.LabelsResponse, error)
 	// Series returns profiles series matching the request. A series is a unique label set.
 	Series(ctx context.Context, in *SeriesRequest, opts ...grpc.CallOption) (*SeriesResponse, error)
 	// SelectMergeStacktraces returns matching profiles aggregated in a flamegraph format. It will combine samples from within the same callstack, with each element being grouped by its function name.
@@ -1278,6 +1280,15 @@ func (c *querierServiceClient) LabelValues(ctx context.Context, in *v1.LabelValu
 func (c *querierServiceClient) LabelNames(ctx context.Context, in *v1.LabelNamesRequest, opts ...grpc.CallOption) (*v1.LabelNamesResponse, error) {
 	out := new(v1.LabelNamesResponse)
 	err := c.cc.Invoke(ctx, "/querier.v1.QuerierService/LabelNames", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *querierServiceClient) Labels(ctx context.Context, in *v1.LabelsRequest, opts ...grpc.CallOption) (*v1.LabelsResponse, error) {
+	out := new(v1.LabelsResponse)
+	err := c.cc.Invoke(ctx, "/querier.v1.QuerierService/Labels", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1366,6 +1377,8 @@ type QuerierServiceServer interface {
 	LabelValues(context.Context, *v1.LabelValuesRequest) (*v1.LabelValuesResponse, error)
 	// LabelNames returns a list of the existing label names.
 	LabelNames(context.Context, *v1.LabelNamesRequest) (*v1.LabelNamesResponse, error)
+	// Labels returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
+	Labels(context.Context, *v1.LabelsRequest) (*v1.LabelsResponse, error)
 	// Series returns profiles series matching the request. A series is a unique label set.
 	Series(context.Context, *SeriesRequest) (*SeriesResponse, error)
 	// SelectMergeStacktraces returns matching profiles aggregated in a flamegraph format. It will combine samples from within the same callstack, with each element being grouped by its function name.
@@ -1396,6 +1409,9 @@ func (UnimplementedQuerierServiceServer) LabelValues(context.Context, *v1.LabelV
 }
 func (UnimplementedQuerierServiceServer) LabelNames(context.Context, *v1.LabelNamesRequest) (*v1.LabelNamesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LabelNames not implemented")
+}
+func (UnimplementedQuerierServiceServer) Labels(context.Context, *v1.LabelsRequest) (*v1.LabelsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Labels not implemented")
 }
 func (UnimplementedQuerierServiceServer) Series(context.Context, *SeriesRequest) (*SeriesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Series not implemented")
@@ -1484,6 +1500,24 @@ func _QuerierService_LabelNames_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(QuerierServiceServer).LabelNames(ctx, req.(*v1.LabelNamesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QuerierService_Labels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.LabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QuerierServiceServer).Labels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/querier.v1.QuerierService/Labels",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QuerierServiceServer).Labels(ctx, req.(*v1.LabelsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1650,6 +1684,10 @@ var QuerierService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LabelNames",
 			Handler:    _QuerierService_LabelNames_Handler,
+		},
+		{
+			MethodName: "Labels",
+			Handler:    _QuerierService_Labels_Handler,
 		},
 		{
 			MethodName: "Series",

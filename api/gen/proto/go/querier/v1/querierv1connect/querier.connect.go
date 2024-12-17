@@ -44,6 +44,8 @@ const (
 	// QuerierServiceLabelNamesProcedure is the fully-qualified name of the QuerierService's LabelNames
 	// RPC.
 	QuerierServiceLabelNamesProcedure = "/querier.v1.QuerierService/LabelNames"
+	// QuerierServiceLabelsProcedure is the fully-qualified name of the QuerierService's Labels RPC.
+	QuerierServiceLabelsProcedure = "/querier.v1.QuerierService/Labels"
 	// QuerierServiceSeriesProcedure is the fully-qualified name of the QuerierService's Series RPC.
 	QuerierServiceSeriesProcedure = "/querier.v1.QuerierService/Series"
 	// QuerierServiceSelectMergeStacktracesProcedure is the fully-qualified name of the QuerierService's
@@ -74,6 +76,7 @@ var (
 	querierServiceProfileTypesMethodDescriptor           = querierServiceServiceDescriptor.Methods().ByName("ProfileTypes")
 	querierServiceLabelValuesMethodDescriptor            = querierServiceServiceDescriptor.Methods().ByName("LabelValues")
 	querierServiceLabelNamesMethodDescriptor             = querierServiceServiceDescriptor.Methods().ByName("LabelNames")
+	querierServiceLabelsMethodDescriptor                 = querierServiceServiceDescriptor.Methods().ByName("Labels")
 	querierServiceSeriesMethodDescriptor                 = querierServiceServiceDescriptor.Methods().ByName("Series")
 	querierServiceSelectMergeStacktracesMethodDescriptor = querierServiceServiceDescriptor.Methods().ByName("SelectMergeStacktraces")
 	querierServiceSelectMergeSpanProfileMethodDescriptor = querierServiceServiceDescriptor.Methods().ByName("SelectMergeSpanProfile")
@@ -92,6 +95,8 @@ type QuerierServiceClient interface {
 	LabelValues(context.Context, *connect.Request[v11.LabelValuesRequest]) (*connect.Response[v11.LabelValuesResponse], error)
 	// LabelNames returns a list of the existing label names.
 	LabelNames(context.Context, *connect.Request[v11.LabelNamesRequest]) (*connect.Response[v11.LabelNamesResponse], error)
+	// Labels returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
+	Labels(context.Context, *connect.Request[v11.LabelsRequest]) (*connect.Response[v11.LabelsResponse], error)
 	// Series returns profiles series matching the request. A series is a unique label set.
 	Series(context.Context, *connect.Request[v1.SeriesRequest]) (*connect.Response[v1.SeriesResponse], error)
 	// SelectMergeStacktraces returns matching profiles aggregated in a flamegraph format. It will combine samples from within the same callstack, with each element being grouped by its function name.
@@ -135,6 +140,12 @@ func NewQuerierServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+QuerierServiceLabelNamesProcedure,
 			connect.WithSchema(querierServiceLabelNamesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		labels: connect.NewClient[v11.LabelsRequest, v11.LabelsResponse](
+			httpClient,
+			baseURL+QuerierServiceLabelsProcedure,
+			connect.WithSchema(querierServiceLabelsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		series: connect.NewClient[v1.SeriesRequest, v1.SeriesResponse](
@@ -193,6 +204,7 @@ type querierServiceClient struct {
 	profileTypes           *connect.Client[v1.ProfileTypesRequest, v1.ProfileTypesResponse]
 	labelValues            *connect.Client[v11.LabelValuesRequest, v11.LabelValuesResponse]
 	labelNames             *connect.Client[v11.LabelNamesRequest, v11.LabelNamesResponse]
+	labels                 *connect.Client[v11.LabelsRequest, v11.LabelsResponse]
 	series                 *connect.Client[v1.SeriesRequest, v1.SeriesResponse]
 	selectMergeStacktraces *connect.Client[v1.SelectMergeStacktracesRequest, v1.SelectMergeStacktracesResponse]
 	selectMergeSpanProfile *connect.Client[v1.SelectMergeSpanProfileRequest, v1.SelectMergeSpanProfileResponse]
@@ -216,6 +228,11 @@ func (c *querierServiceClient) LabelValues(ctx context.Context, req *connect.Req
 // LabelNames calls querier.v1.QuerierService.LabelNames.
 func (c *querierServiceClient) LabelNames(ctx context.Context, req *connect.Request[v11.LabelNamesRequest]) (*connect.Response[v11.LabelNamesResponse], error) {
 	return c.labelNames.CallUnary(ctx, req)
+}
+
+// Labels calls querier.v1.QuerierService.Labels.
+func (c *querierServiceClient) Labels(ctx context.Context, req *connect.Request[v11.LabelsRequest]) (*connect.Response[v11.LabelsResponse], error) {
+	return c.labels.CallUnary(ctx, req)
 }
 
 // Series calls querier.v1.QuerierService.Series.
@@ -266,6 +283,8 @@ type QuerierServiceHandler interface {
 	LabelValues(context.Context, *connect.Request[v11.LabelValuesRequest]) (*connect.Response[v11.LabelValuesResponse], error)
 	// LabelNames returns a list of the existing label names.
 	LabelNames(context.Context, *connect.Request[v11.LabelNamesRequest]) (*connect.Response[v11.LabelNamesResponse], error)
+	// Labels returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
+	Labels(context.Context, *connect.Request[v11.LabelsRequest]) (*connect.Response[v11.LabelsResponse], error)
 	// Series returns profiles series matching the request. A series is a unique label set.
 	Series(context.Context, *connect.Request[v1.SeriesRequest]) (*connect.Response[v1.SeriesResponse], error)
 	// SelectMergeStacktraces returns matching profiles aggregated in a flamegraph format. It will combine samples from within the same callstack, with each element being grouped by its function name.
@@ -305,6 +324,12 @@ func NewQuerierServiceHandler(svc QuerierServiceHandler, opts ...connect.Handler
 		QuerierServiceLabelNamesProcedure,
 		svc.LabelNames,
 		connect.WithSchema(querierServiceLabelNamesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	querierServiceLabelsHandler := connect.NewUnaryHandler(
+		QuerierServiceLabelsProcedure,
+		svc.Labels,
+		connect.WithSchema(querierServiceLabelsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	querierServiceSeriesHandler := connect.NewUnaryHandler(
@@ -363,6 +388,8 @@ func NewQuerierServiceHandler(svc QuerierServiceHandler, opts ...connect.Handler
 			querierServiceLabelValuesHandler.ServeHTTP(w, r)
 		case QuerierServiceLabelNamesProcedure:
 			querierServiceLabelNamesHandler.ServeHTTP(w, r)
+		case QuerierServiceLabelsProcedure:
+			querierServiceLabelsHandler.ServeHTTP(w, r)
 		case QuerierServiceSeriesProcedure:
 			querierServiceSeriesHandler.ServeHTTP(w, r)
 		case QuerierServiceSelectMergeStacktracesProcedure:
@@ -398,6 +425,10 @@ func (UnimplementedQuerierServiceHandler) LabelValues(context.Context, *connect.
 
 func (UnimplementedQuerierServiceHandler) LabelNames(context.Context, *connect.Request[v11.LabelNamesRequest]) (*connect.Response[v11.LabelNamesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("querier.v1.QuerierService.LabelNames is not implemented"))
+}
+
+func (UnimplementedQuerierServiceHandler) Labels(context.Context, *connect.Request[v11.LabelsRequest]) (*connect.Response[v11.LabelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("querier.v1.QuerierService.Labels is not implemented"))
 }
 
 func (UnimplementedQuerierServiceHandler) Series(context.Context, *connect.Request[v1.SeriesRequest]) (*connect.Response[v1.SeriesResponse], error) {

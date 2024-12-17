@@ -53,6 +53,21 @@ message LabelNamesResponse {
   repeated string names = 1;
 }
 
+message LabelValues {
+  string name = 1;
+  repeated string values = 2;
+}
+
+message LabelsRequest {
+  repeated string matchers = 1;
+  int64 start = 2;
+  int64 end = 3;
+}
+
+message LabelsResponse {
+  repeated LabelValues labels = 1;
+}
+
 message BlockInfo {
   string ulid = 1;
   int64 min_time = 2;

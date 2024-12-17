@@ -34,6 +34,11 @@ func RegisterQuerierServiceHandler(mux *mux.Router, svc QuerierServiceHandler, o
 		svc.LabelNames,
 		opts...,
 	))
+	mux.Handle("/querier.v1.QuerierService/Labels", connect.NewUnaryHandler(
+		"/querier.v1.QuerierService/Labels",
+		svc.Labels,
+		opts...,
+	))
 	mux.Handle("/querier.v1.QuerierService/Series", connect.NewUnaryHandler(
 		"/querier.v1.QuerierService/Series",
 		svc.Series,

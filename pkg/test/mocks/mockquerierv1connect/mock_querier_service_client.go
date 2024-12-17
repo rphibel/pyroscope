@@ -324,6 +324,65 @@ func (_c *MockQuerierServiceClient_LabelValues_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// Labels provides a mock function with given fields: _a0, _a1
+func (_m *MockQuerierServiceClient) Labels(_a0 context.Context, _a1 *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Labels")
+	}
+
+	var r0 *connect.Response[typesv1.LabelsResponse]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *connect.Request[typesv1.LabelsRequest]) *connect.Response[typesv1.LabelsResponse]); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*connect.Response[typesv1.LabelsResponse])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *connect.Request[typesv1.LabelsRequest]) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerierServiceClient_Labels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Labels'
+type MockQuerierServiceClient_Labels_Call struct {
+	*mock.Call
+}
+
+// Labels is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 *connect.Request[typesv1.LabelsRequest]
+func (_e *MockQuerierServiceClient_Expecter) Labels(_a0 interface{}, _a1 interface{}) *MockQuerierServiceClient_Labels_Call {
+	return &MockQuerierServiceClient_Labels_Call{Call: _e.mock.On("Labels", _a0, _a1)}
+}
+
+func (_c *MockQuerierServiceClient_Labels_Call) Run(run func(_a0 context.Context, _a1 *connect.Request[typesv1.LabelsRequest])) *MockQuerierServiceClient_Labels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*connect.Request[typesv1.LabelsRequest]))
+	})
+	return _c
+}
+
+func (_c *MockQuerierServiceClient_Labels_Call) Return(_a0 *connect.Response[typesv1.LabelsResponse], _a1 error) *MockQuerierServiceClient_Labels_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerierServiceClient_Labels_Call) RunAndReturn(run func(context.Context, *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error)) *MockQuerierServiceClient_Labels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ProfileTypes provides a mock function with given fields: _a0, _a1
 func (_m *MockQuerierServiceClient) ProfileTypes(_a0 context.Context, _a1 *connect.Request[querierv1.ProfileTypesRequest]) (*connect.Response[querierv1.ProfileTypesResponse], error) {
 	ret := _m.Called(_a0, _a1)

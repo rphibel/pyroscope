@@ -342,6 +342,10 @@ func (q *Querier) LabelNames(ctx context.Context, req *connect.Request[typesv1.L
 	}), nil
 }
 
+func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
+	return nil, nil
+}
+
 func (q *Querier) blockSelect(ctx context.Context, start, end model.Time) (blockPlan, error) {
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "blockSelect")
 	defer sp.Finish()

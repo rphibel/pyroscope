@@ -43,6 +43,14 @@ func (r *Router) LabelNames(
 		})
 }
 
+func (r *Router) Labels(ctx context.Context, c *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
+	if r.frontend != nil {
+		return r.frontend.Labels(ctx, c)
+	}
+
+	return connect.NewResponse(&typesv1.LabelsResponse{}), nil
+}
+
 func (r *Router) Series(
 	ctx context.Context,
 	c *connect.Request[querierv1.SeriesRequest],
