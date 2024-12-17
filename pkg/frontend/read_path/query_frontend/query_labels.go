@@ -12,5 +12,6 @@ func (q *QueryFrontend) Labels(
 	ctx context.Context,
 	c *connect.Request[typesv1.LabelsRequest],
 ) (*connect.Response[typesv1.LabelsResponse], error) {
-	return nil, nil
+	// TODO(bryanhuhta): Implement
+	panic("unimplemented")
 }

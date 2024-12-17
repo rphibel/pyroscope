@@ -38,6 +38,7 @@ import (
 	"github.com/grafana/pyroscope/pkg/phlaredb/bucketindex"
 	"github.com/grafana/pyroscope/pkg/pprof"
 	"github.com/grafana/pyroscope/pkg/storegateway"
+	"github.com/grafana/pyroscope/pkg/util"
 	pmath "github.com/grafana/pyroscope/pkg/util/math"
 	"github.com/grafana/pyroscope/pkg/util/spanlogger"
 	"github.com/grafana/pyroscope/pkg/validation"
@@ -343,7 +344,68 @@ func (q *Querier) LabelNames(ctx context.Context, req *connect.Request[typesv1.L
 }
 
 func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
-	return nil, nil
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels")
+	defer sp.Finish()
+
+	if q.storeGatewayQuerier == nil {
+		responses, err := q.labelsFromIngesters(ctx, req.Msg)
+		if err != nil {
+			return nil, err
+		}
+
+		res := connect.NewResponse(&typesv1.LabelsResponse{
+			Labels: uniqueSortedLabels(responses),
+		})
+		return res, nil
+	}
+
+	storeQueries := splitQueryToStores(model.Time(req.Msg.Start), model.Time(req.Msg.End), model.Now(), q.cfg.QueryStoreAfter, nil)
+	if !storeQueries.ingester.shouldQuery && !storeQueries.storeGateway.shouldQuery {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("start and end time are outside of the ingester and store gateway retention"))
+	}
+	storeQueries.Log(level.Debug(spanlogger.FromContext(ctx, q.logger)))
+
+	var responses []ResponseFromReplica[[]*typesv1.LabelValues]
+	var lock sync.Mutex
+	group, gCtx := errgroup.WithContext(ctx)
+
+	if storeQueries.ingester.shouldQuery {
+		group.Go(func() error {
+			ir, err := q.labelsFromIngesters(gCtx, req.Msg)
+			if err != nil {
+				return err
+			}
+
+			lock.Lock()
+			responses = append(responses, ir...)
+			lock.Unlock()
+			return nil
+		})
+	}
+
+	if storeQueries.storeGateway.shouldQuery {
+		group.Go(func() error {
+			ir, err := q.labelsFromStoreGateway(gCtx, req.Msg)
+			if err != nil {
+				return err
+			}
+
+			lock.Lock()
+			responses = append(responses, ir...)
+			lock.Unlock()
+			return nil
+		})
+	}
+
+	err := group.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	res := connect.NewResponse(&typesv1.LabelsResponse{
+		Labels: uniqueSortedLabels(responses),
+	})
+	return res, nil
 }
 
 func (q *Querier) blockSelect(ctx context.Context, start, end model.Time) (blockPlan, error) {
@@ -1050,6 +1112,15 @@ func uniqueSortedStrings(responses []ResponseFromReplica[[]string]) []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+func uniqueSortedLabels(responses []ResponseFromReplica[[]*typesv1.LabelValues]) []*typesv1.LabelValues {
+	unwrappedResponses := make([][]*typesv1.LabelValues, 0, len(responses))
+	for _, r := range responses {
+		unwrappedResponses = append(unwrappedResponses, r.response)
+	}
+
+	return util.SortLabels(unwrappedResponses)
 }
 
 func (q *Querier) selectSpanProfile(ctx context.Context, req *querierv1.SelectMergeSpanProfileRequest) (*phlaremodel.Tree, error) {

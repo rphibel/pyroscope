@@ -24,6 +24,7 @@ import (
 type IngesterQueryClient interface {
 	LabelValues(context.Context, *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
+	Labels(context.Context, *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error)
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	Series(ctx context.Context, req *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error)
 	MergeProfilesStacktraces(context.Context) clientpool.BidiClientMergeProfilesStacktraces
@@ -271,6 +272,13 @@ func (q *Querier) labelNamesFromIngesters(ctx context.Context, req *typesv1.Labe
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return responses, nil
+}
+
+func (q *Querier) labelsFromIngesters(ctx context.Context, req *typesv1.LabelsRequest) ([]ResponseFromReplica[[]*typesv1.LabelValues], error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels Ingesters")
+	defer sp.Finish()
+
+	return nil, nil
 }
 
 func (q *Querier) seriesFromIngesters(ctx context.Context, req *ingesterv1.SeriesRequest) ([]ResponseFromReplica[[]*typesv1.Labels], error) {
