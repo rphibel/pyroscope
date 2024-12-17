@@ -15,16 +15,16 @@ import (
 	"github.com/grafana/pyroscope/pkg/validation"
 )
 
-func (f *Frontend) Labels(
+func (f *Frontend) LabelSummaries(
 	ctx context.Context,
-	c *connect.Request[typesv1.LabelsRequest],
-) (*connect.Response[typesv1.LabelsResponse], error) {
+	c *connect.Request[typesv1.LabelSummariesRequest],
+) (*connect.Response[typesv1.LabelSummariesResponse], error) {
 	opentracing.SpanFromContext(ctx).
 		SetTag("start", model.Time(c.Msg.Start).Time().String()).
 		SetTag("end", model.Time(c.Msg.End).Time().String()).
 		SetTag("matchers", c.Msg.Matchers)
 
-	ctx = connectgrpc.WithProcedure(ctx, querierv1connect.QuerierServiceLabelsProcedure)
+	ctx = connectgrpc.WithProcedure(ctx, querierv1connect.QuerierServiceLabelSummariesProcedure)
 
 	interval, ok := phlaremodel.GetTimeRange(c.Msg)
 	if ok {
@@ -38,11 +38,11 @@ func (f *Frontend) Labels(
 			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		if validated.IsEmpty {
-			return connect.NewResponse(&typesv1.LabelsResponse{}), nil
+			return connect.NewResponse(&typesv1.LabelSummariesResponse{}), nil
 		}
 		c.Msg.Start = int64(validated.Start)
 		c.Msg.End = int64(validated.End)
 	}
 
-	return connectgrpc.RoundTripUnary[typesv1.LabelsRequest, typesv1.LabelsResponse](ctx, f, c)
+	return connectgrpc.RoundTripUnary[typesv1.LabelSummariesRequest, typesv1.LabelSummariesResponse](ctx, f, c)
 }

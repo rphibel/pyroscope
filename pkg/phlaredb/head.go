@@ -15,6 +15,7 @@ import (
 	"github.com/gogo/status"
 	"github.com/google/uuid"
 	"github.com/oklog/ulid"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
@@ -327,7 +328,10 @@ func (h *Head) LabelNames(ctx context.Context, req *connect.Request[typesv1.Labe
 	}), nil
 }
 
-func (h *Head) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1.LabelsResponse, error) {
+func (h *Head) LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest) (*typesv1.LabelSummariesResponse, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LabelSummaries HeadInMemory")
+	defer span.Finish()
+
 	names, err := h.LabelNames(ctx, &connect.Request[typesv1.LabelNamesRequest]{
 		Msg: &typesv1.LabelNamesRequest{
 			Matchers: req.Matchers,
@@ -339,7 +343,7 @@ func (h *Head) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1
 		return nil, err
 	}
 
-	labels := make([]*typesv1.LabelValues, 0, len(names.Msg.Names))
+	summaries := make([]*typesv1.LabelSummary, 0, len(names.Msg.Names))
 	for _, name := range names.Msg.Names {
 		values, err := h.LabelValues(ctx, &connect.Request[typesv1.LabelValuesRequest]{
 			Msg: &typesv1.LabelValuesRequest{
@@ -352,14 +356,14 @@ func (h *Head) Labels(ctx context.Context, req *typesv1.LabelsRequest) (*typesv1
 			return nil, err
 		}
 
-		labels = append(labels, &typesv1.LabelValues{
+		summaries = append(summaries, &typesv1.LabelSummary{
 			Name:   name,
 			Values: values.Msg.Names,
 		})
 	}
 
-	res := &typesv1.LabelsResponse{
-		Labels: labels,
+	res := &typesv1.LabelSummariesResponse{
+		Summaries: summaries,
 	}
 	return res, nil
 }

@@ -12,8 +12,8 @@ service QuerierService {
   rpc LabelValues(types.v1.LabelValuesRequest) returns (types.v1.LabelValuesResponse) {}
   // LabelNames returns a list of the existing label names.
   rpc LabelNames(types.v1.LabelNamesRequest) returns (types.v1.LabelNamesResponse) {}
-  // Labels returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
-  rpc Labels(types.v1.LabelsRequest) returns (types.v1.LabelsResponse) {}
+  // LabelSummaries returns all labels names and their corresponding values. This is the same as calling LabelNames then LabelValues for each label name.
+  rpc LabelSummaries(types.v1.LabelSummariesRequest) returns (types.v1.LabelSummariesResponse) {}
   // Series returns profiles series matching the request. A series is a unique label set.
   rpc Series(SeriesRequest) returns (SeriesResponse) {}
   // SelectMergeStacktraces returns matching profiles aggregated in a flamegraph format. It will combine samples from within the same callstack, with each element being grouped by its function name.

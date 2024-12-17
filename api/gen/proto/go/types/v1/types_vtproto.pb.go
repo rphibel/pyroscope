@@ -221,11 +221,11 @@ func (m *LabelNamesResponse) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
-func (m *LabelValues) CloneVT() *LabelValues {
+func (m *LabelSummary) CloneVT() *LabelSummary {
 	if m == nil {
-		return (*LabelValues)(nil)
+		return (*LabelSummary)(nil)
 	}
-	r := new(LabelValues)
+	r := new(LabelSummary)
 	r.Name = m.Name
 	if rhs := m.Values; rhs != nil {
 		tmpContainer := make([]string, len(rhs))
@@ -239,15 +239,15 @@ func (m *LabelValues) CloneVT() *LabelValues {
 	return r
 }
 
-func (m *LabelValues) CloneMessageVT() proto.Message {
+func (m *LabelSummary) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
-func (m *LabelsRequest) CloneVT() *LabelsRequest {
+func (m *LabelSummariesRequest) CloneVT() *LabelSummariesRequest {
 	if m == nil {
-		return (*LabelsRequest)(nil)
+		return (*LabelSummariesRequest)(nil)
 	}
-	r := new(LabelsRequest)
+	r := new(LabelSummariesRequest)
 	r.Start = m.Start
 	r.End = m.End
 	if rhs := m.Matchers; rhs != nil {
@@ -262,21 +262,21 @@ func (m *LabelsRequest) CloneVT() *LabelsRequest {
 	return r
 }
 
-func (m *LabelsRequest) CloneMessageVT() proto.Message {
+func (m *LabelSummariesRequest) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
-func (m *LabelsResponse) CloneVT() *LabelsResponse {
+func (m *LabelSummariesResponse) CloneVT() *LabelSummariesResponse {
 	if m == nil {
-		return (*LabelsResponse)(nil)
+		return (*LabelSummariesResponse)(nil)
 	}
-	r := new(LabelsResponse)
-	if rhs := m.Labels; rhs != nil {
-		tmpContainer := make([]*LabelValues, len(rhs))
+	r := new(LabelSummariesResponse)
+	if rhs := m.Summaries; rhs != nil {
+		tmpContainer := make([]*LabelSummary, len(rhs))
 		for k, v := range rhs {
 			tmpContainer[k] = v.CloneVT()
 		}
-		r.Labels = tmpContainer
+		r.Summaries = tmpContainer
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -285,7 +285,7 @@ func (m *LabelsResponse) CloneVT() *LabelsResponse {
 	return r
 }
 
-func (m *LabelsResponse) CloneMessageVT() proto.Message {
+func (m *LabelSummariesResponse) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
@@ -713,7 +713,7 @@ func (this *LabelNamesResponse) EqualMessageVT(thatMsg proto.Message) bool {
 	}
 	return this.EqualVT(that)
 }
-func (this *LabelValues) EqualVT(that *LabelValues) bool {
+func (this *LabelSummary) EqualVT(that *LabelSummary) bool {
 	if this == that {
 		return true
 	} else if this == nil || that == nil {
@@ -734,14 +734,14 @@ func (this *LabelValues) EqualVT(that *LabelValues) bool {
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
-func (this *LabelValues) EqualMessageVT(thatMsg proto.Message) bool {
-	that, ok := thatMsg.(*LabelValues)
+func (this *LabelSummary) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*LabelSummary)
 	if !ok {
 		return false
 	}
 	return this.EqualVT(that)
 }
-func (this *LabelsRequest) EqualVT(that *LabelsRequest) bool {
+func (this *LabelSummariesRequest) EqualVT(that *LabelSummariesRequest) bool {
 	if this == that {
 		return true
 	} else if this == nil || that == nil {
@@ -765,30 +765,30 @@ func (this *LabelsRequest) EqualVT(that *LabelsRequest) bool {
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
-func (this *LabelsRequest) EqualMessageVT(thatMsg proto.Message) bool {
-	that, ok := thatMsg.(*LabelsRequest)
+func (this *LabelSummariesRequest) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*LabelSummariesRequest)
 	if !ok {
 		return false
 	}
 	return this.EqualVT(that)
 }
-func (this *LabelsResponse) EqualVT(that *LabelsResponse) bool {
+func (this *LabelSummariesResponse) EqualVT(that *LabelSummariesResponse) bool {
 	if this == that {
 		return true
 	} else if this == nil || that == nil {
 		return false
 	}
-	if len(this.Labels) != len(that.Labels) {
+	if len(this.Summaries) != len(that.Summaries) {
 		return false
 	}
-	for i, vx := range this.Labels {
-		vy := that.Labels[i]
+	for i, vx := range this.Summaries {
+		vy := that.Summaries[i]
 		if p, q := vx, vy; p != q {
 			if p == nil {
-				p = &LabelValues{}
+				p = &LabelSummary{}
 			}
 			if q == nil {
-				q = &LabelValues{}
+				q = &LabelSummary{}
 			}
 			if !p.EqualVT(q) {
 				return false
@@ -798,8 +798,8 @@ func (this *LabelsResponse) EqualVT(that *LabelsResponse) bool {
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
-func (this *LabelsResponse) EqualMessageVT(thatMsg proto.Message) bool {
-	that, ok := thatMsg.(*LabelsResponse)
+func (this *LabelSummariesResponse) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*LabelSummariesResponse)
 	if !ok {
 		return false
 	}
@@ -1468,7 +1468,7 @@ func (m *LabelNamesResponse) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *LabelValues) MarshalVT() (dAtA []byte, err error) {
+func (m *LabelSummary) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -1481,12 +1481,12 @@ func (m *LabelValues) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *LabelValues) MarshalToVT(dAtA []byte) (int, error) {
+func (m *LabelSummary) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *LabelValues) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *LabelSummary) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -1517,7 +1517,7 @@ func (m *LabelValues) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *LabelsRequest) MarshalVT() (dAtA []byte, err error) {
+func (m *LabelSummariesRequest) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -1530,12 +1530,12 @@ func (m *LabelsRequest) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *LabelsRequest) MarshalToVT(dAtA []byte) (int, error) {
+func (m *LabelSummariesRequest) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *LabelsRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *LabelSummariesRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -1569,7 +1569,7 @@ func (m *LabelsRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *LabelsResponse) MarshalVT() (dAtA []byte, err error) {
+func (m *LabelSummariesResponse) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -1582,12 +1582,12 @@ func (m *LabelsResponse) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *LabelsResponse) MarshalToVT(dAtA []byte) (int, error) {
+func (m *LabelSummariesResponse) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *LabelsResponse) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *LabelSummariesResponse) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -1599,9 +1599,9 @@ func (m *LabelsResponse) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if len(m.Labels) > 0 {
-		for iNdEx := len(m.Labels) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.Labels[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+	if len(m.Summaries) > 0 {
+		for iNdEx := len(m.Summaries) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Summaries[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -2157,7 +2157,7 @@ func (m *LabelNamesResponse) SizeVT() (n int) {
 	return n
 }
 
-func (m *LabelValues) SizeVT() (n int) {
+func (m *LabelSummary) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -2177,7 +2177,7 @@ func (m *LabelValues) SizeVT() (n int) {
 	return n
 }
 
-func (m *LabelsRequest) SizeVT() (n int) {
+func (m *LabelSummariesRequest) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -2199,14 +2199,14 @@ func (m *LabelsRequest) SizeVT() (n int) {
 	return n
 }
 
-func (m *LabelsResponse) SizeVT() (n int) {
+func (m *LabelSummariesResponse) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if len(m.Labels) > 0 {
-		for _, e := range m.Labels {
+	if len(m.Summaries) > 0 {
+		for _, e := range m.Summaries {
 			l = e.SizeVT()
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
@@ -3432,7 +3432,7 @@ func (m *LabelNamesResponse) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *LabelValues) UnmarshalVT(dAtA []byte) error {
+func (m *LabelSummary) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3455,10 +3455,10 @@ func (m *LabelValues) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LabelValues: wiretype end group for non-group")
+			return fmt.Errorf("proto: LabelSummary: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LabelValues: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LabelSummary: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3547,7 +3547,7 @@ func (m *LabelValues) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *LabelsRequest) UnmarshalVT(dAtA []byte) error {
+func (m *LabelSummariesRequest) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3570,10 +3570,10 @@ func (m *LabelsRequest) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LabelsRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: LabelSummariesRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LabelsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LabelSummariesRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3668,7 +3668,7 @@ func (m *LabelsRequest) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *LabelsResponse) UnmarshalVT(dAtA []byte) error {
+func (m *LabelSummariesResponse) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -3691,15 +3691,15 @@ func (m *LabelsResponse) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LabelsResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: LabelSummariesResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LabelsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LabelSummariesResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Labels", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Summaries", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -3726,8 +3726,8 @@ func (m *LabelsResponse) UnmarshalVT(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Labels = append(m.Labels, &LabelValues{})
-			if err := m.Labels[len(m.Labels)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+			m.Summaries = append(m.Summaries, &LabelSummary{})
+			if err := m.Summaries[len(m.Summaries)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

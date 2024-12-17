@@ -24,9 +24,9 @@ func (i *Ingester) LabelNames(ctx context.Context, req *connect.Request[typesv1.
 }
 
 // Labels returns all the possible label names and their corresponding values.
-func (i *Ingester) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
-	return forInstanceUnary(ctx, i, func(instance *instance) (*connect.Response[typesv1.LabelsResponse], error) {
-		return instance.Labels(ctx, req)
+func (i *Ingester) LabelSummaries(ctx context.Context, req *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	return forInstanceUnary(ctx, i, func(instance *instance) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+		return instance.LabelSummaries(ctx, req)
 	})
 }
 

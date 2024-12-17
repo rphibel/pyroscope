@@ -343,8 +343,8 @@ func (q *Querier) LabelNames(ctx context.Context, req *connect.Request[typesv1.L
 	}), nil
 }
 
-func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
-	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels")
+func (q *Querier) LabelSummaries(ctx context.Context, req *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "LabelSummaries")
 	defer sp.Finish()
 
 	if q.storeGatewayQuerier == nil {
@@ -353,8 +353,8 @@ func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.Label
 			return nil, err
 		}
 
-		res := connect.NewResponse(&typesv1.LabelsResponse{
-			Labels: uniqueSortedLabels(responses),
+		res := connect.NewResponse(&typesv1.LabelSummariesResponse{
+			Summaries: uniqueSortedLabels(responses),
 		})
 		return res, nil
 	}
@@ -365,7 +365,7 @@ func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.Label
 	}
 	storeQueries.Log(level.Debug(spanlogger.FromContext(ctx, q.logger)))
 
-	var responses []ResponseFromReplica[[]*typesv1.LabelValues]
+	var responses []ResponseFromReplica[[]*typesv1.LabelSummary]
 	var lock sync.Mutex
 	group, gCtx := errgroup.WithContext(ctx)
 
@@ -402,8 +402,8 @@ func (q *Querier) Labels(ctx context.Context, req *connect.Request[typesv1.Label
 		return nil, err
 	}
 
-	res := connect.NewResponse(&typesv1.LabelsResponse{
-		Labels: uniqueSortedLabels(responses),
+	res := connect.NewResponse(&typesv1.LabelSummariesResponse{
+		Summaries: uniqueSortedLabels(responses),
 	})
 	return res, nil
 }
@@ -1114,13 +1114,13 @@ func uniqueSortedStrings(responses []ResponseFromReplica[[]string]) []string {
 	return result
 }
 
-func uniqueSortedLabels(responses []ResponseFromReplica[[]*typesv1.LabelValues]) []*typesv1.LabelValues {
-	unwrappedResponses := make([][]*typesv1.LabelValues, 0, len(responses))
+func uniqueSortedLabels(responses []ResponseFromReplica[[]*typesv1.LabelSummary]) []*typesv1.LabelSummary {
+	unwrappedResponses := make([][]*typesv1.LabelSummary, 0, len(responses))
 	for _, r := range responses {
 		unwrappedResponses = append(unwrappedResponses, r.response)
 	}
 
-	return util.UniqueSortLabels(unwrappedResponses)
+	return util.UniquelySortLabelSummaries(unwrappedResponses)
 }
 
 func (q *Querier) selectSpanProfile(ctx context.Context, req *querierv1.SelectMergeSpanProfileRequest) (*phlaremodel.Tree, error) {

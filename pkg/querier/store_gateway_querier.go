@@ -36,7 +36,7 @@ type StoreGatewayQueryClient interface {
 	ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error)
 	LabelValues(context.Context, *connect.Request[typesv1.LabelValuesRequest]) (*connect.Response[typesv1.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[typesv1.LabelNamesRequest]) (*connect.Response[typesv1.LabelNamesResponse], error)
-	Labels(context.Context, *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error)
+	LabelSummaries(context.Context, *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error)
 	Series(context.Context, *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error)
 	BlockMetadata(ctx context.Context, req *connect.Request[ingestv1.BlockMetadataRequest]) (*connect.Response[ingestv1.BlockMetadataResponse], error)
 	GetBlockStats(ctx context.Context, req *connect.Request[ingestv1.GetBlockStatsRequest]) (*connect.Response[ingestv1.GetBlockStatsResponse], error)
@@ -381,8 +381,8 @@ func (q *Querier) labelNamesFromStoreGateway(ctx context.Context, req *typesv1.L
 	return responses, nil
 }
 
-func (q *Querier) labelsFromStoreGateway(ctx context.Context, req *typesv1.LabelsRequest) ([]ResponseFromReplica[[]*typesv1.LabelValues], error) {
-	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels StoreGateway")
+func (q *Querier) labelsFromStoreGateway(ctx context.Context, req *typesv1.LabelSummariesRequest) ([]ResponseFromReplica[[]*typesv1.LabelSummary], error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "LabelSummaries StoreGateway")
 	defer sp.Finish()
 
 	tenantID, err := tenant.ExtractTenantIDFromContext(ctx)
@@ -390,12 +390,12 @@ func (q *Querier) labelsFromStoreGateway(ctx context.Context, req *typesv1.Label
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	responses, err := forAllStoreGateways(ctx, tenantID, q.storeGatewayQuerier, func(ctx context.Context, sc StoreGatewayQueryClient) ([]*typesv1.LabelValues, error) {
-		res, err := sc.Labels(ctx, connect.NewRequest(req))
+	responses, err := forAllStoreGateways(ctx, tenantID, q.storeGatewayQuerier, func(ctx context.Context, sc StoreGatewayQueryClient) ([]*typesv1.LabelSummary, error) {
+		res, err := sc.LabelSummaries(ctx, connect.NewRequest(req))
 		if err != nil {
 			return nil, err
 		}
-		return res.Msg.Labels, nil
+		return res.Msg.Summaries, nil
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

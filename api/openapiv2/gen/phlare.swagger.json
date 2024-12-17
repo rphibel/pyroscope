@@ -1276,7 +1276,19 @@
         }
       }
     },
-    "v1LabelValues": {
+    "v1LabelSummariesResponse": {
+      "type": "object",
+      "properties": {
+        "summaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1LabelSummary"
+          }
+        }
+      }
+    },
+    "v1LabelSummary": {
       "type": "object",
       "properties": {
         "name": {
@@ -1333,18 +1345,6 @@
             "$ref": "#/definitions/v1LabelPair"
           },
           "title": "LabelPair is the key value pairs to identify the corresponding profile"
-        }
-      }
-    },
-    "v1LabelsResponse": {
-      "type": "object",
-      "properties": {
-        "labels": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/v1LabelValues"
-          }
         }
       }
     },

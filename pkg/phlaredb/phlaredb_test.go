@@ -126,6 +126,10 @@ func (i *ingesterHandlerPhlareDB) LabelNames(context.Context, *connect.Request[t
 	return nil, errors.New("not implemented")
 }
 
+func (i *ingesterHandlerPhlareDB) LabelSummaries(context.Context, *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	return nil, errors.New("not implemented")
+}
+
 func (i *ingesterHandlerPhlareDB) ProfileTypes(context.Context, *connect.Request[ingestv1.ProfileTypesRequest]) (*connect.Response[ingestv1.ProfileTypesResponse], error) {
 	return nil, errors.New("not implemented")
 }

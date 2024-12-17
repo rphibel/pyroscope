@@ -7,7 +7,8 @@ import (
 	typesv1 "github.com/grafana/pyroscope/api/gen/proto/go/types/v1"
 )
 
-func UniqueSortLabels(responses [][]*typesv1.LabelValues) []*typesv1.LabelValues {
+// UniquelySortLabelSummaries merges and deduplicates label names and values.
+func UniquelySortLabelSummaries(responses [][]*typesv1.LabelSummary) []*typesv1.LabelSummary {
 	// Merge label names and their values, deduplicating along the way.
 	unique := make(map[string]map[string]struct{})
 	for _, response := range responses {
@@ -24,22 +25,22 @@ func UniqueSortLabels(responses [][]*typesv1.LabelValues) []*typesv1.LabelValues
 
 	// Merge the deduplicated label names and values back into a slice, sorting
 	// the values.
-	result := make([]*typesv1.LabelValues, 0, len(unique))
+	result := make([]*typesv1.LabelSummary, 0, len(unique))
 	for name, values := range unique {
-		label := &typesv1.LabelValues{
+		summary := &typesv1.LabelSummary{
 			Name:   name,
 			Values: make([]string, 0, len(values)),
 		}
 
 		for value := range values {
-			label.Values = append(label.Values, value)
+			summary.Values = append(summary.Values, value)
 		}
-		slices.Sort(label.Values)
-		result = append(result, label)
+		slices.Sort(summary.Values)
+		result = append(result, summary)
 	}
 
 	// Lastly, sort by label name.
-	slices.SortFunc(result, func(a, b *typesv1.LabelValues) int {
+	slices.SortFunc(result, func(a, b *typesv1.LabelSummary) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 	return result

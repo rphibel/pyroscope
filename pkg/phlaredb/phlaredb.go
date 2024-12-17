@@ -413,9 +413,9 @@ func (f *PhlareDB) LabelNames(ctx context.Context, req *connect.Request[typesv1.
 	return f.queriers().LabelNames(ctx, req)
 }
 
-// Labels returns all the possible label names and their corresponding values.
-func (f *PhlareDB) Labels(ctx context.Context, req *connect.Request[typesv1.LabelsRequest]) (*connect.Response[typesv1.LabelsResponse], error) {
-	sp, ctx := opentracing.StartSpanFromContext(ctx, "PhlareDB Labels")
+// LabelSummaries returns all the possible label names and their corresponding values.
+func (f *PhlareDB) LabelSummaries(ctx context.Context, req *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	sp, ctx := opentracing.StartSpanFromContext(ctx, "PhlareDB LabelSummaries")
 	defer sp.Finish()
 
 	f.headLock.RLock()
@@ -423,9 +423,9 @@ func (f *PhlareDB) Labels(ctx context.Context, req *connect.Request[typesv1.Labe
 
 	_, ok := phlaremodel.GetTimeRange(req.Msg)
 	if !ok {
-		return f.headQueriers().Labels(ctx, req)
+		return f.headQueriers().LabelSummaries(ctx, req)
 	}
-	return f.queriers().Labels(ctx, req)
+	return f.queriers().LabelSummaries(ctx, req)
 }
 
 // ProfileTypes returns the possible profile types.

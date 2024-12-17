@@ -1714,7 +1714,7 @@ type IngesterServiceClient interface {
 	Push(ctx context.Context, in *v11.PushRequest, opts ...grpc.CallOption) (*v11.PushResponse, error)
 	LabelValues(ctx context.Context, in *v1.LabelValuesRequest, opts ...grpc.CallOption) (*v1.LabelValuesResponse, error)
 	LabelNames(ctx context.Context, in *v1.LabelNamesRequest, opts ...grpc.CallOption) (*v1.LabelNamesResponse, error)
-	Labels(ctx context.Context, in *v1.LabelsRequest, opts ...grpc.CallOption) (*v1.LabelsResponse, error)
+	LabelSummaries(ctx context.Context, in *v1.LabelSummariesRequest, opts ...grpc.CallOption) (*v1.LabelSummariesResponse, error)
 	// Deprecated: ProfileType call is deprecated in the store components
 	// TODO: Remove this call in release v1.4
 	ProfileTypes(ctx context.Context, in *ProfileTypesRequest, opts ...grpc.CallOption) (*ProfileTypesResponse, error)
@@ -1765,9 +1765,9 @@ func (c *ingesterServiceClient) LabelNames(ctx context.Context, in *v1.LabelName
 	return out, nil
 }
 
-func (c *ingesterServiceClient) Labels(ctx context.Context, in *v1.LabelsRequest, opts ...grpc.CallOption) (*v1.LabelsResponse, error) {
-	out := new(v1.LabelsResponse)
-	err := c.cc.Invoke(ctx, "/ingester.v1.IngesterService/Labels", in, out, opts...)
+func (c *ingesterServiceClient) LabelSummaries(ctx context.Context, in *v1.LabelSummariesRequest, opts ...grpc.CallOption) (*v1.LabelSummariesResponse, error) {
+	out := new(v1.LabelSummariesResponse)
+	err := c.cc.Invoke(ctx, "/ingester.v1.IngesterService/LabelSummaries", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1959,7 +1959,7 @@ type IngesterServiceServer interface {
 	Push(context.Context, *v11.PushRequest) (*v11.PushResponse, error)
 	LabelValues(context.Context, *v1.LabelValuesRequest) (*v1.LabelValuesResponse, error)
 	LabelNames(context.Context, *v1.LabelNamesRequest) (*v1.LabelNamesResponse, error)
-	Labels(context.Context, *v1.LabelsRequest) (*v1.LabelsResponse, error)
+	LabelSummaries(context.Context, *v1.LabelSummariesRequest) (*v1.LabelSummariesResponse, error)
 	// Deprecated: ProfileType call is deprecated in the store components
 	// TODO: Remove this call in release v1.4
 	ProfileTypes(context.Context, *ProfileTypesRequest) (*ProfileTypesResponse, error)
@@ -1989,8 +1989,8 @@ func (UnimplementedIngesterServiceServer) LabelValues(context.Context, *v1.Label
 func (UnimplementedIngesterServiceServer) LabelNames(context.Context, *v1.LabelNamesRequest) (*v1.LabelNamesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LabelNames not implemented")
 }
-func (UnimplementedIngesterServiceServer) Labels(context.Context, *v1.LabelsRequest) (*v1.LabelsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Labels not implemented")
+func (UnimplementedIngesterServiceServer) LabelSummaries(context.Context, *v1.LabelSummariesRequest) (*v1.LabelSummariesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LabelSummaries not implemented")
 }
 func (UnimplementedIngesterServiceServer) ProfileTypes(context.Context, *ProfileTypesRequest) (*ProfileTypesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProfileTypes not implemented")
@@ -2089,20 +2089,20 @@ func _IngesterService_LabelNames_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _IngesterService_Labels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.LabelsRequest)
+func _IngesterService_LabelSummaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.LabelSummariesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IngesterServiceServer).Labels(ctx, in)
+		return srv.(IngesterServiceServer).LabelSummaries(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ingester.v1.IngesterService/Labels",
+		FullMethod: "/ingester.v1.IngesterService/LabelSummaries",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IngesterServiceServer).Labels(ctx, req.(*v1.LabelsRequest))
+		return srv.(IngesterServiceServer).LabelSummaries(ctx, req.(*v1.LabelSummariesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2339,8 +2339,8 @@ var IngesterService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _IngesterService_LabelNames_Handler,
 		},
 		{
-			MethodName: "Labels",
-			Handler:    _IngesterService_Labels_Handler,
+			MethodName: "LabelSummaries",
+			Handler:    _IngesterService_LabelSummaries_Handler,
 		},
 		{
 			MethodName: "ProfileTypes",
