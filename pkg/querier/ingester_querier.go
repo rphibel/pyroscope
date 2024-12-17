@@ -278,7 +278,18 @@ func (q *Querier) labelsFromIngesters(ctx context.Context, req *typesv1.LabelsRe
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels Ingesters")
 	defer sp.Finish()
 
-	return nil, nil
+	responses, err := forAllIngesters(ctx, q.ingesterQuerier, func(ctx context.Context, ic IngesterQueryClient) ([]*typesv1.LabelValues, error) {
+		res, err := ic.Labels(ctx, connect.NewRequest(req))
+		if err != nil {
+			return nil, err
+		}
+		return res.Msg.Labels, nil
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return responses, nil
 }
 
 func (q *Querier) seriesFromIngesters(ctx context.Context, req *ingesterv1.SeriesRequest) ([]ResponseFromReplica[[]*typesv1.Labels], error) {

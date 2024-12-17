@@ -385,7 +385,23 @@ func (q *Querier) labelsFromStoreGateway(ctx context.Context, req *typesv1.Label
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels StoreGateway")
 	defer sp.Finish()
 
-	return nil, nil
+	tenantID, err := tenant.ExtractTenantIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	responses, err := forAllStoreGateways(ctx, tenantID, q.storeGatewayQuerier, func(ctx context.Context, sc StoreGatewayQueryClient) ([]*typesv1.LabelValues, error) {
+		res, err := sc.Labels(ctx, connect.NewRequest(req))
+		if err != nil {
+			return nil, err
+		}
+		return res.Msg.Labels, nil
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return responses, nil
 }
 
 func (q *Querier) seriesFromStoreGateway(ctx context.Context, req *ingestv1.SeriesRequest) ([]ResponseFromReplica[[]*typesv1.Labels], error) {
