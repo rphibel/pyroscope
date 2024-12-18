@@ -334,9 +334,9 @@ func (h *Head) LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRe
 
 	names, err := h.LabelNames(ctx, &connect.Request[typesv1.LabelNamesRequest]{
 		Msg: &typesv1.LabelNamesRequest{
-			Matchers: req.Matchers,
 			Start:    req.Start,
 			End:      req.End,
+			Matchers: req.Matchers,
 		},
 	})
 	if err != nil {
@@ -347,9 +347,10 @@ func (h *Head) LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRe
 	for _, name := range names.Msg.Names {
 		values, err := h.LabelValues(ctx, &connect.Request[typesv1.LabelValuesRequest]{
 			Msg: &typesv1.LabelValuesRequest{
-				Name:  name,
-				Start: req.Start,
-				End:   req.End,
+				Name:     name,
+				Start:    req.Start,
+				End:      req.End,
+				Matchers: req.Matchers,
 			},
 		})
 		if err != nil {

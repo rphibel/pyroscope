@@ -537,12 +537,20 @@ func (b *singleBlockQuerier) LabelSummaries(ctx context.Context, req *typesv1.La
 		return nil, err
 	}
 
+	iters := make([]index.Postings, 0, 1)
 	names := []string{}
 	if selectors.matchesAll() {
 		names, err = b.index.LabelNames()
 		if err != nil {
 			return nil, err
 		}
+
+		k, v := index.AllPostingsKey()
+		iter, err := b.index.Postings(k, nil, v)
+		if err != nil {
+			return nil, err
+		}
+		iters = append(iters, iter)
 	} else {
 		var iters []index.Postings
 		for _, matchers := range selectors {
@@ -572,22 +580,41 @@ func (b *singleBlockQuerier) LabelSummaries(ctx context.Context, req *typesv1.La
 		for name := range nameSet {
 			names = append(names, name)
 		}
+
+		for _, matchers := range selectors {
+			iter, err := PostingsForMatchers(b.index, nil, matchers...)
+			if err != nil {
+				return nil, err
+			}
+			iters = append(iters, iter)
+		}
 	}
 
 	summaries := make([]*typesv1.LabelSummary, 0, len(names))
 	for _, name := range names {
-		values, err := b.index.LabelValues(name)
-		if err != nil {
-			if err == storage.ErrNotFound {
-				continue
-			}
-			return nil, err
-		}
-
 		summaries = append(summaries, &typesv1.LabelSummary{
-			Name:   name,
-			Values: values,
+			Name: name,
 		})
+	}
+
+	iter := index.Intersect(iters...)
+	for iter.Next() {
+		for _, summary := range summaries {
+			value, err := b.index.LabelValueFor(iter.At(), summary.Name)
+			if err != nil {
+				if err == storage.ErrNotFound {
+					continue
+				}
+				return nil, err
+			}
+
+			index, found := slices.BinarySearch(summary.Values, value)
+			if !found {
+				summary.Values = append(summary.Values, value)
+				copy(summary.Values[index+1:], summary.Values[index:])
+				summary.Values[index] = value
+			}
+		}
 	}
 
 	res := &typesv1.LabelSummariesResponse{
