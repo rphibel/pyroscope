@@ -97,6 +97,23 @@ func (s *StoreGateway) LabelNames(ctx context.Context, req *connect.Request[type
 	return connect.NewResponse(res), nil
 }
 
+func (s *StoreGateway) LabelSummaries(ctx context.Context, req *connect.Request[typesv1.LabelSummariesRequest]) (*connect.Response[typesv1.LabelSummariesResponse], error) {
+	var res *typesv1.LabelSummariesResponse
+	_, err := s.forBucketStore(ctx, func(bs *BucketStore) error {
+		var err error
+		res, err = phlaredb.LabelSummaries(ctx, req.Msg, bs.openBlocksForReading)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(res), nil
+}
+
 func (s *StoreGateway) Series(ctx context.Context, req *connect.Request[ingestv1.SeriesRequest]) (*connect.Response[ingestv1.SeriesResponse], error) {
 	var res *ingestv1.SeriesResponse
 	_, err := s.forBucketStore(ctx, func(bs *BucketStore) error {

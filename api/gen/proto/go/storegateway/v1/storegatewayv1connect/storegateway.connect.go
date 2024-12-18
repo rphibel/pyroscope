@@ -56,6 +56,9 @@ const (
 	// StoreGatewayServiceLabelNamesProcedure is the fully-qualified name of the StoreGatewayService's
 	// LabelNames RPC.
 	StoreGatewayServiceLabelNamesProcedure = "/storegateway.v1.StoreGatewayService/LabelNames"
+	// StoreGatewayServiceLabelSummariesProcedure is the fully-qualified name of the
+	// StoreGatewayService's LabelSummaries RPC.
+	StoreGatewayServiceLabelSummariesProcedure = "/storegateway.v1.StoreGatewayService/LabelSummaries"
 	// StoreGatewayServiceSeriesProcedure is the fully-qualified name of the StoreGatewayService's
 	// Series RPC.
 	StoreGatewayServiceSeriesProcedure = "/storegateway.v1.StoreGatewayService/Series"
@@ -77,6 +80,7 @@ var (
 	storeGatewayServiceProfileTypesMethodDescriptor             = storeGatewayServiceServiceDescriptor.Methods().ByName("ProfileTypes")
 	storeGatewayServiceLabelValuesMethodDescriptor              = storeGatewayServiceServiceDescriptor.Methods().ByName("LabelValues")
 	storeGatewayServiceLabelNamesMethodDescriptor               = storeGatewayServiceServiceDescriptor.Methods().ByName("LabelNames")
+	storeGatewayServiceLabelSummariesMethodDescriptor           = storeGatewayServiceServiceDescriptor.Methods().ByName("LabelSummaries")
 	storeGatewayServiceSeriesMethodDescriptor                   = storeGatewayServiceServiceDescriptor.Methods().ByName("Series")
 	storeGatewayServiceBlockMetadataMethodDescriptor            = storeGatewayServiceServiceDescriptor.Methods().ByName("BlockMetadata")
 	storeGatewayServiceGetBlockStatsMethodDescriptor            = storeGatewayServiceServiceDescriptor.Methods().ByName("GetBlockStats")
@@ -93,6 +97,7 @@ type StoreGatewayServiceClient interface {
 	ProfileTypes(context.Context, *connect.Request[v11.ProfileTypesRequest]) (*connect.Response[v11.ProfileTypesResponse], error)
 	LabelValues(context.Context, *connect.Request[v12.LabelValuesRequest]) (*connect.Response[v12.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error)
 	Series(context.Context, *connect.Request[v11.SeriesRequest]) (*connect.Response[v11.SeriesResponse], error)
 	BlockMetadata(context.Context, *connect.Request[v11.BlockMetadataRequest]) (*connect.Response[v11.BlockMetadataResponse], error)
 	GetBlockStats(context.Context, *connect.Request[v11.GetBlockStatsRequest]) (*connect.Response[v11.GetBlockStatsResponse], error)
@@ -150,6 +155,12 @@ func NewStoreGatewayServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(storeGatewayServiceLabelNamesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		labelSummaries: connect.NewClient[v12.LabelSummariesRequest, v12.LabelSummariesResponse](
+			httpClient,
+			baseURL+StoreGatewayServiceLabelSummariesProcedure,
+			connect.WithSchema(storeGatewayServiceLabelSummariesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		series: connect.NewClient[v11.SeriesRequest, v11.SeriesResponse](
 			httpClient,
 			baseURL+StoreGatewayServiceSeriesProcedure,
@@ -180,6 +191,7 @@ type storeGatewayServiceClient struct {
 	profileTypes             *connect.Client[v11.ProfileTypesRequest, v11.ProfileTypesResponse]
 	labelValues              *connect.Client[v12.LabelValuesRequest, v12.LabelValuesResponse]
 	labelNames               *connect.Client[v12.LabelNamesRequest, v12.LabelNamesResponse]
+	labelSummaries           *connect.Client[v12.LabelSummariesRequest, v12.LabelSummariesResponse]
 	series                   *connect.Client[v11.SeriesRequest, v11.SeriesResponse]
 	blockMetadata            *connect.Client[v11.BlockMetadataRequest, v11.BlockMetadataResponse]
 	getBlockStats            *connect.Client[v11.GetBlockStatsRequest, v11.GetBlockStatsResponse]
@@ -220,6 +232,11 @@ func (c *storeGatewayServiceClient) LabelNames(ctx context.Context, req *connect
 	return c.labelNames.CallUnary(ctx, req)
 }
 
+// LabelSummaries calls storegateway.v1.StoreGatewayService.LabelSummaries.
+func (c *storeGatewayServiceClient) LabelSummaries(ctx context.Context, req *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error) {
+	return c.labelSummaries.CallUnary(ctx, req)
+}
+
 // Series calls storegateway.v1.StoreGatewayService.Series.
 func (c *storeGatewayServiceClient) Series(ctx context.Context, req *connect.Request[v11.SeriesRequest]) (*connect.Response[v11.SeriesResponse], error) {
 	return c.series.CallUnary(ctx, req)
@@ -247,6 +264,7 @@ type StoreGatewayServiceHandler interface {
 	ProfileTypes(context.Context, *connect.Request[v11.ProfileTypesRequest]) (*connect.Response[v11.ProfileTypesResponse], error)
 	LabelValues(context.Context, *connect.Request[v12.LabelValuesRequest]) (*connect.Response[v12.LabelValuesResponse], error)
 	LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error)
+	LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error)
 	Series(context.Context, *connect.Request[v11.SeriesRequest]) (*connect.Response[v11.SeriesResponse], error)
 	BlockMetadata(context.Context, *connect.Request[v11.BlockMetadataRequest]) (*connect.Response[v11.BlockMetadataResponse], error)
 	GetBlockStats(context.Context, *connect.Request[v11.GetBlockStatsRequest]) (*connect.Response[v11.GetBlockStatsResponse], error)
@@ -300,6 +318,12 @@ func NewStoreGatewayServiceHandler(svc StoreGatewayServiceHandler, opts ...conne
 		connect.WithSchema(storeGatewayServiceLabelNamesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	storeGatewayServiceLabelSummariesHandler := connect.NewUnaryHandler(
+		StoreGatewayServiceLabelSummariesProcedure,
+		svc.LabelSummaries,
+		connect.WithSchema(storeGatewayServiceLabelSummariesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	storeGatewayServiceSeriesHandler := connect.NewUnaryHandler(
 		StoreGatewayServiceSeriesProcedure,
 		svc.Series,
@@ -334,6 +358,8 @@ func NewStoreGatewayServiceHandler(svc StoreGatewayServiceHandler, opts ...conne
 			storeGatewayServiceLabelValuesHandler.ServeHTTP(w, r)
 		case StoreGatewayServiceLabelNamesProcedure:
 			storeGatewayServiceLabelNamesHandler.ServeHTTP(w, r)
+		case StoreGatewayServiceLabelSummariesProcedure:
+			storeGatewayServiceLabelSummariesHandler.ServeHTTP(w, r)
 		case StoreGatewayServiceSeriesProcedure:
 			storeGatewayServiceSeriesHandler.ServeHTTP(w, r)
 		case StoreGatewayServiceBlockMetadataProcedure:
@@ -375,6 +401,10 @@ func (UnimplementedStoreGatewayServiceHandler) LabelValues(context.Context, *con
 
 func (UnimplementedStoreGatewayServiceHandler) LabelNames(context.Context, *connect.Request[v12.LabelNamesRequest]) (*connect.Response[v12.LabelNamesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("storegateway.v1.StoreGatewayService.LabelNames is not implemented"))
+}
+
+func (UnimplementedStoreGatewayServiceHandler) LabelSummaries(context.Context, *connect.Request[v12.LabelSummariesRequest]) (*connect.Response[v12.LabelSummariesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("storegateway.v1.StoreGatewayService.LabelSummaries is not implemented"))
 }
 
 func (UnimplementedStoreGatewayServiceHandler) Series(context.Context, *connect.Request[v11.SeriesRequest]) (*connect.Response[v11.SeriesResponse], error) {

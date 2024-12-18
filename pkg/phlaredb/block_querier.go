@@ -768,7 +768,7 @@ func (queriers Queriers) LabelSummaries(ctx context.Context, req *connect.Reques
 		}
 	}
 
-	res, err := Labels(ctx, req.Msg, blockGetter)
+	res, err := LabelSummaries(ctx, req.Msg, blockGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -1527,7 +1527,7 @@ func LabelNames(ctx context.Context, req *connect.Request[typesv1.LabelNamesRequ
 	}, nil
 }
 
-func Labels(ctx context.Context, req *typesv1.LabelSummariesRequest, blockGetter BlockGetter) (*typesv1.LabelSummariesResponse, error) {
+func LabelSummaries(ctx context.Context, req *typesv1.LabelSummariesRequest, blockGetter BlockGetter) (*typesv1.LabelSummariesResponse, error) {
 	queriers, err := blockGetter(ctx, model.Time(req.Start), model.Time(req.End), nil)
 	if err != nil {
 		return nil, err
