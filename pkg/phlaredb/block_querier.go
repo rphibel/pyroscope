@@ -526,95 +526,46 @@ func (b *singleBlockQuerier) LabelSummaries(ctx context.Context, req *typesv1.La
 	sp, ctx := opentracing.StartSpanFromContext(ctx, "Labels Block")
 	defer sp.Finish()
 
-	if err := b.Open(ctx); err != nil {
-		return nil, err
-	}
-	b.queries.Add(1)
-	defer b.queries.Done()
-
-	selectors, err := parseSelectors(req.Matchers)
+	namesRes, err := b.LabelNames(ctx, connect.NewRequest(&typesv1.LabelNamesRequest{
+		Start:    req.Start,
+		End:      req.End,
+		Matchers: req.Matchers,
+	}))
 	if err != nil {
 		return nil, err
 	}
 
-	iters := make([]index.Postings, 0, 1)
-	names := []string{}
-	if selectors.matchesAll() {
-		names, err = b.index.LabelNames()
-		if err != nil {
-			return nil, err
-		}
-
-		k, v := index.AllPostingsKey()
-		iter, err := b.index.Postings(k, nil, v)
-		if err != nil {
-			return nil, err
-		}
-		iters = append(iters, iter)
-	} else {
-		var iters []index.Postings
-		for _, matchers := range selectors {
-			iter, err := PostingsForMatchers(b.index, nil, matchers...)
-			if err != nil {
-				return nil, err
-			}
-			iters = append(iters, iter)
-		}
-
-		nameSet := make(map[string]struct{})
-		iter := index.Intersect(iters...)
-		for iter.Next() {
-			names, err := b.index.LabelNamesFor(iter.At())
-			if err != nil {
-				if err == storage.ErrNotFound {
-					continue
-				}
-				return nil, err
-			}
-
-			for _, name := range names {
-				nameSet[name] = struct{}{}
-			}
-		}
-
-		for name := range nameSet {
-			names = append(names, name)
-		}
-
-		for _, matchers := range selectors {
-			iter, err := PostingsForMatchers(b.index, nil, matchers...)
-			if err != nil {
-				return nil, err
-			}
-			iters = append(iters, iter)
-		}
-	}
-
+	names := namesRes.Msg.Names
 	summaries := make([]*typesv1.LabelSummary, 0, len(names))
+	valueSet := make(map[string]struct{})
+
 	for _, name := range names {
-		summaries = append(summaries, &typesv1.LabelSummary{
-			Name: name,
-		})
-	}
-
-	iter := index.Intersect(iters...)
-	for iter.Next() {
-		for _, summary := range summaries {
-			value, err := b.index.LabelValueFor(iter.At(), summary.Name)
-			if err != nil {
-				if err == storage.ErrNotFound {
-					continue
-				}
-				return nil, err
-			}
-
-			index, found := slices.BinarySearch(summary.Values, value)
-			if !found {
-				summary.Values = append(summary.Values, value)
-				copy(summary.Values[index+1:], summary.Values[index:])
-				summary.Values[index] = value
-			}
+		valuesRes, err := b.LabelValues(ctx, connect.NewRequest(&typesv1.LabelValuesRequest{
+			Name:     name,
+			Start:    req.Start,
+			End:      req.End,
+			Matchers: req.Matchers,
+		}))
+		if err != nil {
+			return nil, err
 		}
+
+		for k := range valueSet {
+			delete(valueSet, k)
+		}
+
+		for _, value := range valuesRes.Msg.Names {
+			valueSet[value] = struct{}{}
+		}
+
+		summary := &typesv1.LabelSummary{
+			Name:   name,
+			Values: make([]string, 0, len(valueSet)),
+		}
+		for value := range valueSet {
+			summary.Values = append(summary.Values, value)
+		}
+		summaries = append(summaries, summary)
 	}
 
 	res := &typesv1.LabelSummariesResponse{
