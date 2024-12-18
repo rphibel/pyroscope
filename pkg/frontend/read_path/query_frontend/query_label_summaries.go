@@ -13,5 +13,5 @@ func (q *QueryFrontend) LabelSummaries(
 	c *connect.Request[typesv1.LabelSummariesRequest],
 ) (*connect.Response[typesv1.LabelSummariesResponse], error) {
 	// TODO(bryanhuhta): Implement
-	panic("unimplemented")
+	panic("unimplemented for v2")
 }
